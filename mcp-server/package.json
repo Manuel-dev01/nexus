@@ -1,0 +1,21 @@
+{
+  "name": "nexus-mcp-server",
+  "version": "0.1.0",
+  "description": "Nexus AI Agent MCP Server — domain-specific tools for the decentralized dataset marketplace",
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "@mysten/sui": "^1.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "tsx": "^4.0.0",
+    "@types/node": "^22.0.0"
+  }
+}
