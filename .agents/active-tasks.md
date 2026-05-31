@@ -12,7 +12,7 @@
 - [x] Scaffold complete repository structure
 - [x] Create .gitignore, .env.example, README.md
 - [x] Populate .agents/ context files
-- [ ] Initialize Move project (`sui move build` passes)
+- [x] Initialize Move project (`sui move build` passes) — v1.73.0
 - [x] First semantic git commit (edc68e5)
 
 ## Phase 1 — The Spike (Day 2: June 1)
