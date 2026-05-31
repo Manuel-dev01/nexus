@@ -9,11 +9,11 @@
 - [x] Verify Tatum Sui RPC gateway endpoints & auth
 - [x] Flag divergences from antigravity.md spec
 - [x] Update antigravity.md with verified infrastructure
-- [/] Scaffold complete repository structure
-- [ ] Create .gitignore, .env.example, README.md
-- [ ] Populate .agents/ context files
+- [x] Scaffold complete repository structure
+- [x] Create .gitignore, .env.example, README.md
+- [x] Populate .agents/ context files
 - [ ] Initialize Move project (`sui move build` passes)
-- [ ] First semantic git commit
+- [x] First semantic git commit (edc68e5)
 
 ## Phase 1 — The Spike (Day 2: June 1)
 
