@@ -137,7 +137,8 @@ This is the heart of the product.
 
 ## 9. TECH STACK (PINNED)
 
-* **Contracts:** Sui Move (latest framework). Test via `sui move test`.
+* **Contracts:** Sui Move (latest framework, v1.73.0 testnet). Test via `sui move test`.
+* **Move.toml:** Do NOT add explicit `Sui` git dependency — CLI v1.73.0+ auto-resolves `MoveStdlib`, `Sui`, `Bridge`, `DeepBook`, `SuiSystem`.
 * **Frontend:** SvelteKit + TypeScript + Tailwind. `@mysten/dapp-kit` for wallet connections. (SvelteKit is explicitly chosen to align with Walrus UI tutorials).
 * **Walrus SDK:** `@mysten/walrus` + `@mysten/sui` for programmatic blob upload/download.
 * **AI Server:** Node.js + TypeScript. Two-server MCP architecture:
@@ -234,11 +235,11 @@ Every build decision serves this 2–3 minute video.
 
 ## 18. BUILD PHASES & MILESTONES
 
-* **Phase 0 (Day 1):** Verify & scaffold. Read live Walrus/Tatum docs. Initialize SvelteKit and Move directories. Acceptance: `sui move build` works.
-* **Phase 1 (Day 2):** The Spike. Write a script to upload a mock file to Walrus and read it back. Do not build UI until this works.
-* **Phase 2 (Days 3-4):** Move Contracts & Frontend UI. Write `nexus_marketplace.move`. Build SvelteKit views. Acceptance: Can manually upload, list, and buy via browser wallet.
-* **Phase 3 (Day 5):** AI Server (MCP). Build the Node.js server exposing the Sui/Tatum search tools to the LLM. Acceptance: An LLM can read the marketplace state.
-* **Phase 4 (Day 6):** Seed, Polish, Record. Run the seeder. Record the video perfectly. Submit.
+* **Phase 0 (Day 1 — May 31): ✅ COMPLETE.** Verified live Walrus/Tatum docs. Found 5 divergences (§8 updated). Scaffolded repo (17 files). `sui move build` passes on CLI v1.73.0. Two semantic commits: `edc68e5`, `3402480`.
+* **Phase 1 (Day 2 — June 1):** The Spike. Write a script to upload a mock file to Walrus and read it back. Do not build UI until this works.
+* **Phase 2 (Days 3-4 — June 2-3):** Move Contracts & Frontend UI. Write `nexus_marketplace.move`. Build SvelteKit views. Acceptance: Can manually upload, list, and buy via browser wallet.
+* **Phase 3 (Day 5 — June 4):** AI Server (MCP). Build the Node.js server exposing the Sui/Tatum search tools to the LLM. Acceptance: An LLM can read the marketplace state.
+* **Phase 4 (Day 6 — June 5-6):** Seed, Polish, Record. Run the seeder. Record the video perfectly. Submit by June 6.
 
 ## 19. SCOPE TIERS (ANTI-GOLD-PLATING)
 
@@ -273,8 +274,10 @@ If a feature doesn't serve these two metrics, drop it.
 
 ## 24. KNOWN RISKS & OPEN QUESTIONS
 
-* Exact Walrus Devnet/Testnet publisher URLs. (Verify in Phase 0).
-* How Tatum MCP handles Sui complex data types. (Test early).
+* ~~Exact Walrus Devnet/Testnet publisher URLs.~~ **RESOLVED Phase 0:** Publisher: `publisher.walrus-testnet.walrus.space`, Aggregator: `aggregator.walrus-testnet.walrus.space`. See §8.2.
+* ~~How Tatum MCP handles Sui complex data types.~~ **PARTIALLY RESOLVED Phase 0:** Tatum MCP is a closed server (`@tatumio/blockchain-mcp`). It exposes `gateway_execute_rpc` for raw Sui JSON-RPC calls. We build a separate Nexus MCP server for domain logic. See §8.5. Still need Phase 1 spike to test actual `sui_queryEvents` through Tatum.
+* **NEW:** Network reliability — first `sui move build` failed due to git clone timeout. Auto-resolved deps (empty `[dependencies]` in Move.toml) work but still need a one-time GitHub fetch. Retry succeeded.
+* **NEW:** Sui CLI installed via manual binary download (suiup GitHub release). Path: `$USERPROFILE\bin\sui.exe`. Not on system PATH — use full path or add to PATH.
 
 ## 25. OUT OF SCOPE (DO NOT BUILD)
 
@@ -287,5 +290,48 @@ If a feature doesn't serve these two metrics, drop it.
 * Work in small, verifiable increments; run tests; report pass/fail; propose the next step.
 * When live docs differ from this file, stop and tell me before coding.
 * Default to action on routine decisions; escalate only genuine forks.
+
+## 27. SESSION LOG
+
+### Session 1 — 2026-05-31 (Phase 0)
+
+**Duration:** ~3 hours | **Commits:** `edc68e5`, `3402480`
+
+**Accomplished:**
+1. Researched live Walrus docs (`docs.wal.app`), Tatum MCP (`@tatumio/blockchain-mcp`), and Sui RPC gateway.
+2. Identified 5 divergences from original spec — all documented and corrected in §8.
+3. Critical finding: Tatum MCP is closed (no custom tools). Architecture pivoted to two-server MCP composition.
+4. Scaffolded full repo: 17 files across `.agents/`, `move/`, `frontend/`, `mcp-server/`, `scripts/`.
+5. Installed Sui CLI v1.73.0 (testnet binary). `sui move build` passes.
+6. Created high-impact README.md for hackathon judges.
+
+**Decisions made:**
+- ADR-001: Two-server MCP architecture (Tatum + custom Nexus)
+- ADR-002: HTTP API for spike, SDK for production
+- ADR-003: Testnet-first development
+- Move.toml uses empty `[dependencies]` (auto-resolved by CLI v1.73.0+)
+
+**Next session:** Phase 1 — The Spike (upload mock text to Walrus → capture blobId → query via Tatum Sui RPC → read back)
+
+---
+
+### Session 2 — 2026-06-02 (Phase 1: The Spike)
+
+**Duration:** ~1 hour
+
+**Accomplished:**
+1. Created `scripts/package.json` and `scripts/tsconfig.json` for spike infrastructure.
+2. Wrote `walrus-spike.ts` — self-contained validation script using raw `fetch()` (per ADR-002).
+3. Discovered corporate firewall (DANCOM/Fortinet) blocking Walrus endpoints — switched networks.
+4. **Walrus Upload validated:** `PUT /v1/blobs` → blobId `bJb3aHwiTsHAaa3B-Ra1dcyrnpDmgVXKgcPnI3RsTg0`.
+5. **Walrus Download validated:** `GET /v1/blobs/<ID>` → 211 bytes round-tripped, content matches.
+6. **Tatum Sui RPC validated:** `sui_getLatestCheckpointSequenceNumber` → checkpoint `343886846`.
+7. All 3 infrastructure checks: ✅ PASS.
+
+**Issues encountered:**
+- Corporate network (Fortinet) blocks `*.walrus.space` as "Unrated" — resolved by switching to unrestricted network.
+- Walrus testnet TLS certs triggered `SELF_SIGNED_CERT_IN_CHAIN` on corporate network (firewall MITM) — resolved with network switch.
+
+**Next session:** Phase 2 — Move Contracts & Frontend (write `nexus_marketplace.move`, `nexus_events.move`, tests, SvelteKit UI)
 
 ---

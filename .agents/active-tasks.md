@@ -1,6 +1,6 @@
 # Nexus — Active Development Backlog
 
-> Updated: 2026-05-31 | Current Phase: 0 (Verify & Scaffold)
+> Updated: 2026-06-02 | Current Phase: 1 COMPLETE → Ready for Phase 2
 
 ## Phase 0 — Verify & Scaffold (Day 1: May 31)
 
@@ -15,13 +15,13 @@
 - [x] Initialize Move project (`sui move build` passes) — v1.73.0
 - [x] First semantic git commit (edc68e5)
 
-## Phase 1 — The Spike (Day 2: June 1)
+## Phase 1 — The Spike (Day 2: June 1–2)
 
-- [ ] Write walrus-spike.ts: upload mock text to Walrus Publisher
-- [ ] Parse blobId from upload response
-- [ ] Read blob back from Walrus Aggregator via HTTP GET
-- [ ] Route Sui RPC read through Tatum gateway to confirm connectivity
-- [ ] Validate full pipeline: Upload → Store blobId → Query via Tatum → Download
+- [x] Write walrus-spike.ts: upload mock text to Walrus Publisher
+- [x] Parse blobId from upload response — `bJb3aHwiTsHAaa3B-Ra1dcyrnpDmgVXKgcPnI3RsTg0`
+- [x] Read blob back from Walrus Aggregator via HTTP GET — 211 bytes verified
+- [x] Route Sui RPC read through Tatum gateway to confirm connectivity — checkpoint 343886846
+- [x] Validate full pipeline: Upload → Store blobId → Query via Tatum → Download ✅
 
 ## Phase 2 — Move Contracts & Frontend (Days 3-4: June 2-3)
 
