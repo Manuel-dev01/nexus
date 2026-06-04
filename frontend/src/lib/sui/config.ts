@@ -20,9 +20,11 @@ export const NETWORK = import.meta.env.PUBLIC_SUI_NETWORK || 'testnet';
 
 // === Package IDs (deployed contract addresses) ===
 
-export const PACKAGE_ID = import.meta.env.PUBLIC_NEXUS_PACKAGE_ID || '';
+export const PACKAGE_ID = import.meta.env.PUBLIC_NEXUS_PACKAGE_ID
+  || '0xd4121a4525729f9319db53d66967f0669a5eff6603009d346befe9bac5b74816';
 
-export const MARKETPLACE_ID = import.meta.env.PUBLIC_NEXUS_MARKETPLACE_ID || '';
+export const MARKETPLACE_ID = import.meta.env.PUBLIC_NEXUS_MARKETPLACE_ID
+  || '0x7718f693693cac1637a972ae9a6cf14fdacb0d275a8c8b1aef34eb4b4dae1bce';
 
 // === SuiClient Initialization ===
 

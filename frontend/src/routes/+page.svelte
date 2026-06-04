@@ -40,6 +40,8 @@
     error = null;
 
     try {
+      console.log('Loading datasets, PACKAGE_ID:', PACKAGE_ID);
+
       // Use event-based approach to discover listings
       const res = await fetch('https://fullnode.testnet.sui.io:443', {
         method: 'POST',
@@ -58,7 +60,9 @@
       });
 
       const data = await res.json() as any;
+      console.log('RPC response:', data);
       const events = data.result?.data || [];
+      console.log('Events found:', events.length);
 
       const loadedDatasets: Dataset[] = [];
 
