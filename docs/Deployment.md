@@ -53,14 +53,32 @@ Copy `.env.example` to `.env` and fill in:
 npx vite build
 ```
 
-### 4. Deploy to Vercel/Netlify
+### 4. Deploy to Vercel
 ```bash
-# Vercel
+# Deploy from frontend directory
+cd frontend
 vercel --prod
-
-# Netlify
-netlify deploy --prod
 ```
+
+**Vercel Configuration:**
+- Uses `adapter-static` (outputs to `build/` directory)
+- `vercel-build.sh` script handles npm install + build
+- `framework: null` in vercel.json to prevent Vercel's SvelteKit preset from overriding build command
+
+**Required Vercel Dashboard Settings:**
+1. **Framework Preset** → "Other" (not SvelteKit)
+2. **Build Command** → `bash vercel-build.sh`
+3. **Output Directory** → `frontend/build`
+4. **Install Command** → `echo skip`
+5. **Deployment Protection** → Disable "Vercel Authentication"
+
+**Environment Variables (set in Vercel Dashboard):**
+| Name | Value |
+|------|-------|
+| `PUBLIC_NEXUS_PACKAGE_ID` | `0xd4121a4525729f9319db53d66967f0669a5eff6603009d346befe9bac5b74816` |
+| `PUBLIC_NEXUS_MARKETPLACE_ID` | `0x7718f693693cac1637a972ae9a6cf14fdacb0d275a8c8b1aef34eb4b4dae1bce` |
+
+Note: Contract addresses are also hardcoded in `frontend/src/lib/sui/config.ts` as fallbacks.
 
 ## MCP Server Deployment
 
