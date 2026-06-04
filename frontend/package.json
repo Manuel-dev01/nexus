@@ -25,6 +25,7 @@
 		"@mysten/dapp-kit": "^1.0.0",
 		"@mysten/sui": "^2.0.0",
 		"@mysten/walrus": "^1.0.0",
+		"@sveltejs/adapter-vercel": "^6.3.3",
 		"@tanstack/svelte-query": "^5.0.0",
 		"zod": "^3.23.0"
 	}
