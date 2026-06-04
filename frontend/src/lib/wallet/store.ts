@@ -9,7 +9,7 @@
 
 import { getWallets, type WalletWithFeatures } from '@mysten/wallet-standard';
 import type { SuiSignAndExecuteTransactionFeature } from '@mysten/wallet-standard';
-import type { SuiConnectFeature, SuiDisconnectFeature } from '@mysten/wallet-standard';
+import type { ConnectFeature, DisconnectFeature } from '@mysten/wallet-standard';
 import { Transaction } from '@mysten/sui/transactions';
 
 // === Types ===
@@ -18,7 +18,7 @@ export interface WalletInfo {
   name: string;
   icon: string;
   adapter: WalletWithFeatures<
-    SuiConnectFeature & SuiDisconnectFeature & SuiSignAndExecuteTransactionFeature
+    ConnectFeature & DisconnectFeature & SuiSignAndExecuteTransactionFeature
   >;
 }
 
@@ -103,9 +103,7 @@ export async function signAndExecuteTransaction(
 
   const result = await signFeature.signAndExecuteTransaction({
     transaction: tx,
-    account: (wallet.adapter.features['standard:connect'] as any)
-      ? undefined
-      : undefined,
+    account: undefined,
     chain: 'sui:testnet',
   });
 

@@ -35,11 +35,9 @@ module nexus::nexus_marketplace {
     const EListingNotFound: u64 = 3;
     const EListingNotActive: u64 = 4;
     const EInvalidPrice: u64 = 5;
-    const EInvalidEpochs: u64 = 6;
     const EEmptyName: u64 = 7;
     const EEmptyDescription: u64 = 8;
     const EEmptyWalrusBlobId: u64 = 9;
-    const EAlreadyHasAccess: u64 = 10;
 
     // === Constants ===
 
@@ -99,6 +97,8 @@ module nexus::nexus_marketplace {
         content_hash: Option<String>,
         /// Optional: Number of epochs the Walrus blob is stored for
         storage_epochs: Option<u64>,
+        /// Addresses that have already purchased this dataset (prevents double-buy)
+        purchasers: Table<address, bool>,
     }
 
     /// Owned object: Proves purchase and grants download access
@@ -232,6 +232,7 @@ module nexus::nexus_marketplace {
             purchase_count: 0,
             content_hash,
             storage_epochs,
+            purchasers: table::new(ctx),
         };
 
         let listing_id = object::id(&listing);
@@ -284,49 +285,70 @@ module nexus::nexus_marketplace {
         assert!(!marketplace.paused, EListingNotActive);
         assert!(table::contains(&marketplace.listings, listing_id), EListingNotFound);
 
+        let buyer = tx_context::sender(ctx);
+        let fee_bps = marketplace.fee_bps;
+
         let listing = table::borrow_mut(&mut marketplace.listings, listing_id);
         assert!(listing.active, EListingNotActive);
 
-        let buyer = tx_context::sender(ctx);
+        // A buyer cannot purchase the same dataset twice.
+        assert!(!table::contains(&listing.purchasers, buyer), EAlreadyPurchased);
+
         let payment_amount = coin::value(&payment);
-        assert!(payment_amount >= listing.price, EInsufficientPayment);
+        let price = listing.price;
+        assert!(payment_amount >= price, EInsufficientPayment);
 
         // Calculate fees
-        let platform_fee = (listing.price * marketplace.fee_bps) / BASIS_POINTS_DENOMINATOR;
-        let provider_payout = listing.price - platform_fee;
+        let platform_fee = (price * fee_bps) / BASIS_POINTS_DENOMINATOR;
+        let provider_payout = price - platform_fee;
 
-        // Split payment: fee to treasury, rest to provider
+        // Take exactly `price` out of the payment; whatever remains is the buyer's change.
         let mut payment_balance = coin::into_balance(payment);
-        let fee_balance = balance::split(&mut payment_balance, platform_fee);
+        let mut sale_balance = balance::split(&mut payment_balance, price);
+
+        // Platform fee → treasury
+        let fee_balance = balance::split(&mut sale_balance, platform_fee);
         balance::join(&mut marketplace.treasury, fee_balance);
 
-        // Convert remaining balance to coin and transfer to provider
-        let provider_coin = coin::from_balance(payment_balance, ctx);
+        // Remaining sale amount (price - fee) → provider
+        let provider_coin = coin::from_balance(sale_balance, ctx);
         transfer::public_transfer(provider_coin, listing.provider);
 
-        // Update listing stats
+        // Refund any overpayment from the BUYER'S OWN coin — never from the treasury.
+        if (balance::value(&payment_balance) > 0) {
+            let refund_coin = coin::from_balance(payment_balance, ctx);
+            transfer::public_transfer(refund_coin, buyer);
+        } else {
+            balance::destroy_zero(payment_balance);
+        };
+
+        // Record the purchase and update listing stats
+        table::add(&mut listing.purchasers, buyer, true);
         listing.purchase_count = listing.purchase_count + 1;
+
+        let timestamp = sui::clock::timestamp_ms(clock);
+        let walrus_blob_id = listing.walrus_blob_id;
+        let content_hash = listing.content_hash;
 
         // Update marketplace stats
         marketplace.total_sales = marketplace.total_sales + 1;
-        marketplace.total_volume = marketplace.total_volume + listing.price;
+        marketplace.total_volume = marketplace.total_volume + price;
 
         // Create access token for buyer
         let access = DatasetAccess {
             id: object::new(ctx),
             listing_id,
-            walrus_blob_id: listing.walrus_blob_id,
+            walrus_blob_id,
             owner: buyer,
-            purchased_at: sui::clock::timestamp_ms(clock),
-            content_hash: listing.content_hash,
+            purchased_at: timestamp,
+            content_hash,
         };
 
         // Emit event
-        let timestamp = sui::clock::timestamp_ms(clock);
         event::emit(DatasetPurchased {
             listing_id,
             buyer,
-            price: listing.price,
+            price,
             platform_fee,
             provider_payout,
             timestamp,
@@ -334,13 +356,6 @@ module nexus::nexus_marketplace {
 
         // Transfer access to buyer
         transfer::transfer(access, buyer);
-
-        // Refund excess payment if any
-        if (payment_amount > listing.price) {
-            let refund_amount = payment_amount - listing.price;
-            let refund_coin = coin::take(&mut marketplace.treasury, refund_amount, ctx);
-            transfer::public_transfer(refund_coin, buyer);
-        }
     }
 
     /// Delist a dataset (only provider can do this)
@@ -431,6 +446,19 @@ module nexus::nexus_marketplace {
         };
         let listing = table::borrow(&marketplace.listings, listing_id);
         listing.active
+    }
+
+    /// Check whether an address has already purchased a listing
+    public fun has_purchased(
+        marketplace: &Marketplace,
+        listing_id: ID,
+        addr: address,
+    ): bool {
+        if (!table::contains(&marketplace.listings, listing_id)) {
+            return false
+        };
+        let listing = table::borrow(&marketplace.listings, listing_id);
+        table::contains(&listing.purchasers, addr)
     }
 
     /// Get access details

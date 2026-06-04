@@ -1,6 +1,6 @@
 # Nexus — Active Development Backlog
 
-> Updated: 2026-06-03 | Current Phase: 2 COMPLETE → Ready for Phase 3
+> Updated: 2026-06-04 | Current Phase: Verified end-to-end (Session 8) → demo prep. Open blockers in `docs/Blockers.md`.
 
 ## Phase 0 — Verify & Scaffold (Day 1: May 31)
 
@@ -54,10 +54,20 @@
 
 ## Phase 4 — Seed, Polish, Record (Day 6: June 5-6)
 
-- [ ] Write `seed_marketplace.ts` (3 real datasets)
-- [ ] Deploy Move contracts to Sui Testnet
-- [ ] Deploy frontend to Vercel
-- [ ] Polish UI animations and error states
+- [x] Write `seed_marketplace.ts` (3 real datasets) — repaired in Session 8, verified via on-chain dry-run
+- [x] Deploy Move contracts to Sui Testnet — redeployed Session 8 (package `0x8620…`, marketplace `0xaea5…`) after the B-4/B-5 contract fixes; re-seeded with 3 datasets
+- [x] Deploy frontend to Vercel (⚠️ pending dashboard: disable auth + set env vars)
+- [x] Polish UI animations and error states
 - [ ] Record 2-3 min demo video per §17
 - [ ] Final README polish
 - [ ] Submit
+
+## Session 8 — Verification, Safe Fixes, Docs (June 4)
+
+- [x] Independent E2E verification of all suites (see CLAUDE.md §27 Session 8)
+- [x] MCP server reads now routed through Tatum (was bypassing it)
+- [x] Frontend TypeScript errors fixed (5 → 0)
+- [x] `seed_marketplace.ts` repaired (programmatic PTB + keypair signing)
+- [x] Homepage event query routed through Tatum
+- [x] Docs hardened + `docs/Blockers.md` triaged report added
+- [ ] **Open blockers** tracked in `docs/Blockers.md` (Vercel auth/env, contract refund bug, Move test stubs)

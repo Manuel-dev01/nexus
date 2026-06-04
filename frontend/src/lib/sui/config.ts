@@ -21,10 +21,10 @@ export const NETWORK = import.meta.env.PUBLIC_SUI_NETWORK || 'testnet';
 // === Package IDs (deployed contract addresses) ===
 
 export const PACKAGE_ID = import.meta.env.PUBLIC_NEXUS_PACKAGE_ID
-  || '0xd4121a4525729f9319db53d66967f0669a5eff6603009d346befe9bac5b74816';
+  || '0x86208eab6fcdadc33273cc65fed9b43177d7c65105ef88134eb635652d258788';
 
 export const MARKETPLACE_ID = import.meta.env.PUBLIC_NEXUS_MARKETPLACE_ID
-  || '0x7718f693693cac1637a972ae9a6cf14fdacb0d275a8c8b1aef34eb4b4dae1bce';
+  || '0xaea5cb73bb7d4b8a6cac69be6dbd7d736cf73ec62563ac87f125c4f0c45f30b2';
 
 // === SuiClient Initialization ===
 
@@ -129,14 +129,14 @@ export function buildListDatasetTransaction(params: {
 export function buildBuyDatasetTransaction(params: {
   marketplaceId: string;
   listingId: string;
-  paymentCoinId: string;
   paymentAmount: number;
   clockId: string;
 }): Transaction {
   const tx = new Transaction();
 
-  // Split coin for payment if needed
-  const [paymentCoin] = tx.splitCoins(tx.object(params.paymentCoinId), [params.paymentAmount]);
+  // Pay by splitting the exact price out of the wallet's gas coin. The contract
+  // refunds any rounding remainder from the buyer's own coin, so exact is safe.
+  const [paymentCoin] = tx.splitCoins(tx.gas, [params.paymentAmount]);
 
   // Call buy_dataset function
   tx.moveCall({
@@ -314,6 +314,31 @@ export async function getUserAccessObjects(address: string): Promise<string[]> {
   });
 
   return objects.data.map(obj => obj.data?.objectId || '').filter(Boolean);
+}
+
+/**
+ * Check whether an address owns a DatasetAccess for a specific listing.
+ * Used to gate downloads behind proof-of-purchase. Routed through Tatum.
+ *
+ * @param address - The user's address
+ * @param listingId - The listing object ID to check access for
+ * @returns Promise<boolean> - true if the address holds access to the listing
+ */
+export async function hasPurchasedListing(address: string, listingId: string): Promise<boolean> {
+  const client = getSuiClient();
+
+  const objects = await client.getOwnedObjects({
+    owner: address,
+    filter: {
+      StructType: `${PACKAGE_ID}::nexus_marketplace::DatasetAccess`,
+    },
+    options: { showContent: true },
+  });
+
+  return objects.data.some((obj) => {
+    const content = obj.data?.content as { dataType?: string; fields?: { listing_id?: string } } | undefined;
+    return content?.dataType === 'moveObject' && content.fields?.listing_id === listingId;
+  });
 }
 
 /**

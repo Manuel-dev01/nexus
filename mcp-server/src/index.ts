@@ -22,8 +22,8 @@ import { createHash } from 'crypto';
 const TATUM_RPC_URL = process.env.TATUM_RPC_URL || 'https://sui-testnet.gateway.tatum.io';
 const TATUM_API_KEY = process.env.TATUM_API_KEY || '';
 const SUI_RPC_URL = 'https://fullnode.testnet.sui.io:443';
-const PACKAGE_ID = process.env.NEXUS_PACKAGE_ID || '0xd4121a4525729f9319db53d66967f0669a5eff6603009d346befe9bac5b74816';
-const MARKETPLACE_ID = process.env.NEXUS_MARKETPLACE_ID || '0x7718f693693cac1637a972ae9a6cf14fdacb0d275a8c8b1aef34eb4b4dae1bce';
+const PACKAGE_ID = process.env.NEXUS_PACKAGE_ID || '0x86208eab6fcdadc33273cc65fed9b43177d7c65105ef88134eb635652d258788';
+const MARKETPLACE_ID = process.env.NEXUS_MARKETPLACE_ID || '0xaea5cb73bb7d4b8a6cac69be6dbd7d736cf73ec62563ac87f125c4f0c45f30b2';
 const WALRUS_AGGREGATOR_URL = process.env.WALRUS_AGGREGATOR_URL || 'https://aggregator.walrus-testnet.walrus.space';
 
 // === Types ===
@@ -69,15 +69,38 @@ function formatFileSize(bytes: number): string {
 }
 
 /**
- * Query Sui RPC directly (bypasses Tatum for reliability).
+ * Query Sui RPC. The Tatum gateway is the primary path — this is the MCP
+ * server's Tatum integration surface, so autonomous-agent reads flow through
+ * Tatum's infrastructure. The public Sui fullnode is an automatic fallback so
+ * a missing key or a transient Tatum hiccup never takes the server down.
  */
 async function suiRpc(method: string, params: any[]): Promise<any> {
+  const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method, params });
+
+  // Primary: Tatum gateway (requires an API key).
+  if (TATUM_API_KEY) {
+    try {
+      const res = await fetch(TATUM_RPC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': TATUM_API_KEY },
+        body,
+      });
+      if (res.ok) {
+        const data = (await res.json()) as any;
+        if (!data.error) return data.result;
+      }
+    } catch {
+      // Fall through to the public fullnode below.
+    }
+  }
+
+  // Fallback: public Sui fullnode.
   const res = await fetch(SUI_RPC_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+    body,
   });
-  const data = await res.json() as any;
+  const data = (await res.json()) as any;
   if (data.error) throw new Error(data.error.message);
   return data.result;
 }
@@ -442,7 +465,11 @@ server.resource(
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
+  const rpcMode = TATUM_API_KEY
+    ? `Tatum gateway (${TATUM_RPC_URL}) with public-fullnode fallback`
+    : `public fullnode only (no TATUM_API_KEY set) — ${SUI_RPC_URL}`;
   console.error('Nexus MCP Server started');
+  console.error(`Sui RPC: ${rpcMode}`);
 }
 
 main().catch(console.error);

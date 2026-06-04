@@ -1,11 +1,18 @@
 # Nexus Deployment Guide
 
+> ### ⚠️ Two manual blockers before the live demo
+> The deployed frontend will not be publicly reachable until **both** of these are done in the Vercel dashboard — neither can be set from code:
+> 1. **Deployment Protection → disable "Vercel Authentication"** (otherwise the URL shows a Vercel login wall).
+> 2. **Set `PUBLIC_NEXUS_PACKAGE_ID` and `PUBLIC_NEXUS_MARKETPLACE_ID`** env vars (recommended; the app also has hardcoded fallbacks, so it loads without them, but set them for prod clarity).
+>
+> See [Required Vercel Dashboard Settings](#required-vercel-dashboard-settings) below. Full open-issue list: [Blockers.md](./Blockers.md).
+
 ## Prerequisites
 
 - Node.js 18+
 - Sui CLI v1.73.0+ (testnet)
 - Sui wallet with testnet SUI
-- Tatum API key (optional, for RPC)
+- Tatum API key — **optional for the frontend** (it falls back to Tatum's anonymous tier / hardcoded config), but **required for the MCP server**, which routes all Sui reads through the Tatum gateway with the public fullnode only as a fallback.
 
 ## Contract Deployment
 
@@ -75,8 +82,8 @@ vercel --prod
 **Environment Variables (set in Vercel Dashboard):**
 | Name | Value |
 |------|-------|
-| `PUBLIC_NEXUS_PACKAGE_ID` | `0xd4121a4525729f9319db53d66967f0669a5eff6603009d346befe9bac5b74816` |
-| `PUBLIC_NEXUS_MARKETPLACE_ID` | `0x7718f693693cac1637a972ae9a6cf14fdacb0d275a8c8b1aef34eb4b4dae1bce` |
+| `PUBLIC_NEXUS_PACKAGE_ID` | `0x86208eab6fcdadc33273cc65fed9b43177d7c65105ef88134eb635652d258788` |
+| `PUBLIC_NEXUS_MARKETPLACE_ID` | `0xaea5cb73bb7d4b8a6cac69be6dbd7d736cf73ec62563ac87f125c4f0c45f30b2` |
 
 Note: Contract addresses are also hardcoded in `frontend/src/lib/sui/config.ts` as fallbacks.
 
@@ -107,6 +114,8 @@ Add to MCP client config:
       "command": "node",
       "args": ["path/to/nexus/mcp-server/dist/index.js"],
       "env": {
+        "TATUM_API_KEY": "<tatum-api-key>",
+        "TATUM_RPC_URL": "https://sui-testnet.gateway.tatum.io",
         "NEXUS_PACKAGE_ID": "<package-id>",
         "NEXUS_MARKETPLACE_ID": "<marketplace-id>"
       }
@@ -121,8 +130,8 @@ Add to MCP client config:
 
 | Component | ID/URL |
 |-----------|--------|
-| Package | `0xd4121a4525729f9319db53d66967f0669a5eff6603009d346befe9bac5b74816` |
-| Marketplace | `0x7718f693693cac1637a972ae9a6cf14fdacb0d275a8c8b1aef34eb4b4dae1bce` |
+| Package | `0x86208eab6fcdadc33273cc65fed9b43177d7c65105ef88134eb635652d258788` |
+| Marketplace | `0xaea5cb73bb7d4b8a6cac69be6dbd7d736cf73ec62563ac87f125c4f0c45f30b2` |
 | Chain ID | `4c78adac` (testnet) |
 | Sui RPC | `https://sui-testnet.gateway.tatum.io` |
 | Walrus Publisher | `https://publisher.walrus-testnet.walrus.space` |

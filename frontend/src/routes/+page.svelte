@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { getSuiClient, MARKETPLACE_ID, PACKAGE_ID, formatSui } from '$lib/sui/config';
+  import { queryMarketplaceEvents, MARKETPLACE_ID, formatSui } from '$lib/sui/config';
   import { formatFileSize } from '$lib/walrus/client';
   import Mark from '$lib/components/Mark.svelte';
 
@@ -40,36 +40,14 @@
     error = null;
 
     try {
-      console.log('Loading datasets, PACKAGE_ID:', PACKAGE_ID);
-
-      // Use event-based approach to discover listings
-      const res = await fetch('https://fullnode.testnet.sui.io:443', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          jsonrpc: '2.0',
-          id: 1,
-          method: 'suix_queryEvents',
-          params: [
-            { MoveModule: { package: PACKAGE_ID, module: 'nexus_marketplace' } },
-            null,
-            50,
-            true,
-          ],
-        }),
-      });
-
-      const data = await res.json() as any;
-      console.log('RPC response:', data);
-      const events = data.result?.data || [];
-      console.log('Events found:', events.length);
+      // Discover listings via DatasetListed events, routed through the
+      // Tatum gateway (getSuiClient) for consistency with the rest of the app.
+      const events = await queryMarketplaceEvents(MARKETPLACE_ID, 'DatasetListed', 50);
 
       const loadedDatasets: Dataset[] = [];
 
       for (const event of events) {
-        if (!event.type?.includes('DatasetListed')) continue;
-
-        const parsed = event.parsedJson || {};
+        const parsed = (event.parsedJson || {}) as any;
         loadedDatasets.push({
           id: parsed.listing_id || '',
           name: parsed.name || 'Unknown',

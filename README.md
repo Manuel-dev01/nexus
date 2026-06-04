@@ -66,20 +66,22 @@ Nexus flips this model:
 
 **Frontend:** https://nexus-l6qjs42ha-manuel-dev01s-projects.vercel.app
 
+> ⚠️ **Public access:** the Vercel project must have **Deployment Protection → Vercel Authentication disabled** for this URL to load without a Vercel login. If you hit a login wall, that toggle is still on — see [docs/Deployment.md](docs/Deployment.md#required-vercel-dashboard-settings).
+
 **Deployed Contracts (Sui Testnet):**
 
 | Contract | Object ID |
 |----------|-----------|
-| Package | `0xd4121a4525729f9319db53d66967f0669a5eff6603009d346befe9bac5b74816` |
-| Marketplace | `0x7718f693693cac1637a972ae9a6cf14fdacb0d275a8c8b1aef34eb4b4dae1bce` |
+| Package | `0x86208eab6fcdadc33273cc65fed9b43177d7c65105ef88134eb635652d258788` |
+| Marketplace | `0xaea5cb73bb7d4b8a6cac69be6dbd7d736cf73ec62563ac87f125c4f0c45f30b2` |
 
 **Seeded Datasets:**
 
 | Dataset | Category | Price | Walrus Blob ID |
 |---------|----------|-------|----------------|
-| GPT-2 Embedding Vectors | embeddings | 0.5 SUI | `CxrYYF3kB_Pv9na0JNXTbVohjkemkFI0wL4kqnCK9Ls` |
-| Fine-Tuning Dataset | fine-tuning | 0.25 SUI | `Tzs6Sfk1aL4pysTUVxJRRjhf14TFJ4jY9VTNacFRz-U` |
-| LoRA Adapter Weights | model-weights | 1.0 SUI | `81FtoDN5MhiLhm0gQBvAEpwEGj5woOWS6PkfFaQgTEE` |
+| GPT-2 Embedding Vectors | embeddings | 0.5 SUI | `K1Ib_CNCEr7rG9rOiPMYd3NGxiF9x4DtlLoHNJJjEy8` |
+| Fine-Tuning Dataset | fine-tuning | 0.25 SUI | `aGir1MudixR_2MezEKRfKHzqwXkBzD1xd9iaFhamZQ0` |
+| LoRA Adapter Weights | model-weights | 1.0 SUI | `foce6UR-SRib69uQJf9i6NCbve6fzGZmxbtCr9WzVV8` |
 
 ---
 
@@ -173,6 +175,8 @@ Data Provider                    AI Agent                      Sui + Walrus
 - [Sui CLI](https://docs.sui.io/build/install) (latest)
 - [Tatum API Key](https://tatum.io/) (free tier)
 
+> **Note:** the contracts in [Live Demo](#live-demo) are already deployed to Sui Testnet **and pre-seeded with the 3 datasets above.** You only need the deploy + seed steps below if you want to run your *own* independent instance.
+
 ### Setup
 
 ```bash
@@ -181,20 +185,23 @@ cd nexus
 
 # Configure environment
 cp .env.example .env
-# Edit .env with your Tatum API key and Sui wallet key
+# Edit .env with your Tatum API key and Sui wallet key (see .env.example for which
+# vars each component needs). The frontend reads frontend/.env (PUBLIC_* vars).
 
-# Deploy contracts
+# Run against the existing testnet deployment (fastest) — just start the app:
+cd frontend && npm install && npm run dev
+
+# --- OR, to stand up your own instance: ---
+
+# Deploy contracts, then copy the printed package + marketplace IDs into .env
 cd move && sui client publish --gas-budget 100000000
-# Copy package ID to .env
 
-# Seed marketplace with demo datasets
-cd ../scripts && npx tsx seed_marketplace.ts
+# Seed your fresh marketplace with the 3 demo datasets (needs SUI_PRIVATE_KEY
+# with testnet gas). Skip this if using the already-seeded testnet deployment.
+cd ../scripts && npm install && npx tsx seed_marketplace.ts
 
-# Start frontend
-cd ../frontend && npm install && npm run dev
-
-# Start MCP server (in separate terminal)
-cd ../mcp-server && npm install && npm start
+# Start MCP server (separate terminal; needs TATUM_API_KEY for Tatum-routed reads)
+cd ../mcp-server && npm install && npm run build && npm start
 ```
 
 > For full deployment instructions, see [docs/Deployment.md](docs/Deployment.md).
@@ -209,6 +216,7 @@ cd ../mcp-server && npm install && npm start
 | [API Reference](docs/API.md) | Smart contract API, Walrus API, MCP tools, Sui RPC |
 | [Deployment Guide](docs/Deployment.md) | Contract deployment, frontend deploy, MCP server setup |
 | [Demo & Verification Flow](docs/Demo-Verification-Flow.md) | Step-by-step guide to verify and demo all features |
+| [Blockers & Gaps](docs/Blockers.md) | Triaged open issues, verified state, and what's been fixed |
 
 ---
 

@@ -19,6 +19,7 @@ import { fileURLToPath } from "url";
 import { createHash } from "crypto";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
+import { SuiJsonRpcClient, JsonRpcHTTPTransport } from "@mysten/sui/jsonRpc";
 
 // Load .env from repo root
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -188,7 +189,8 @@ async function uploadToWalrus(
     {
       method: "PUT",
       headers: { "Content-Type": "application/octet-stream" },
-      body: data,
+      // Buffer is a Uint8Array subclass; pass a plain view so it satisfies BodyInit.
+      body: new Uint8Array(data),
     }
   );
 
@@ -213,33 +215,30 @@ async function uploadToWalrus(
   }
 }
 
-// === Sui RPC Helper ===
+// === Sui Client ===
 
-async function suiRpcCall(method: string, params: any[]): Promise<any> {
-  const response = await fetch(TATUM_SUI_RPC, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-api-key": TATUM_API_KEY,
-    },
-    body: JSON.stringify({
-      jsonrpc: "2.0",
-      id: 1,
-      method,
-      params,
-    }),
-  });
+// NOTE: Building/signing a transaction with the SDK calls
+// `suix_getLatestSuiSystemState` (for the reference gas price), which the Tatum
+// gateway does not expose. So this one-time admin/seed tool signs via the public
+// fullnode. The live *read* paths (frontend + MCP server) still route through
+// Tatum, and the frontend's interactive signing goes through the user's wallet.
+const SUI_FULLNODE_RPC = "https://fullnode.testnet.sui.io:443";
 
-  const json = (await response.json()) as any;
-  if (json.error) {
-    throw new Error(`Sui RPC error: ${json.error.message}`);
-  }
-  return json.result;
+function createSuiClient(): SuiJsonRpcClient {
+  const transport = new JsonRpcHTTPTransport({ url: SUI_FULLNODE_RPC });
+  return new SuiJsonRpcClient({ transport, network: "testnet" });
 }
 
 // === Sui Transaction ===
 
+/**
+ * List a dataset by building a programmatic PTB and signing it with the
+ * deployer keypair, executed through the Tatum gateway. This replaces the old
+ * shell-out to `sui client ptb`, which could not encode the Option<String> /
+ * Option<u64> parameters and required an interactively-configured CLI.
+ */
 async function listDatasetOnSui(
+  client: SuiJsonRpcClient,
   keypair: Ed25519Keypair,
   dataset: DatasetConfig,
   walrusBlobId: string,
@@ -248,42 +247,37 @@ async function listDatasetOnSui(
 ): Promise<string> {
   console.log(`   Listing on Sui marketplace...`);
 
-  // Use sui client CLI for transaction execution (more reliable)
-  const { execSync } = await import("child_process");
+  const tx = new Transaction();
+  tx.moveCall({
+    target: `${PACKAGE_ID}::nexus_marketplace::list_dataset`,
+    arguments: [
+      tx.object(MARKETPLACE_ID),
+      tx.pure.string(dataset.name),
+      tx.pure.string(dataset.description),
+      tx.pure.string(dataset.category),
+      tx.pure.string(walrusBlobId),
+      tx.pure.u64(sizeBytes),
+      tx.pure.u64(dataset.price),
+      tx.pure.option("string", contentHash),
+      tx.pure.option("u64", null),
+      tx.object("0x6"), // Sui system Clock
+    ],
+  });
+  tx.setGasBudget(100_000_000);
 
-  // Build PTB transaction using --assign and --move-call
-  // We need to handle Option types properly
-  const args = [
-    "sui", "client", "ptb",
-    "--assign", `marketplace`, MARKETPLACE_ID,
-    "--assign", `name`, `"${dataset.name}"`,
-    "--assign", `desc`, `"${dataset.description}"`,
-    "--assign", `cat`, `"${dataset.category}"`,
-    "--assign", `blob`, `"${walrusBlobId}"`,
-    "--assign", `size`, `${sizeBytes}`,
-    "--assign", `price`, `${dataset.price}`,
-    "--assign", `clock`, `"0x6"`,
-    "--move-call", `${PACKAGE_ID}::nexus_marketplace::list_dataset`,
-    `marketplace`, `name`, `desc`, `cat`, `blob`, `size`, `price`,
-    "--gas-budget", "100000000",
-    "--json",
-  ];
+  const result = await client.signAndExecuteTransaction({
+    signer: keypair,
+    transaction: tx,
+    options: { showEffects: true },
+  });
 
-  try {
-    const cmd = args.join(" ");
-    console.log(`   Executing: ${cmd.substring(0, 100)}...`);
-    const output = execSync(cmd, { encoding: "utf-8", timeout: 120000 });
-    const result = JSON.parse(output);
-
-    if (result.digest) {
-      return result.digest;
-    } else {
-      throw new Error(`Unexpected result: ${output}`);
-    }
-  } catch (err: any) {
-    console.error(`   ❌ Transaction failed: ${err.message}`);
-    throw err;
+  if (result.effects?.status?.status !== "success") {
+    throw new Error(
+      `Transaction failed: ${JSON.stringify(result.effects?.status)}`
+    );
   }
+
+  return result.digest;
 }
 
 // === Main Seeder ===
@@ -317,9 +311,10 @@ async function main() {
     process.exit(1);
   }
 
-  // Initialize keypair from private key (bech32 format)
+  // Initialize keypair from private key (bech32 format) and Tatum-backed client
   const keypair = Ed25519Keypair.fromSecretKey(DEPLOYER_PRIVATE_KEY);
   const deployerAddress = keypair.toSuiAddress();
+  const client = createSuiClient();
 
   console.log(`  Deployer: ${deployerAddress}`);
   console.log(`  Package: ${PACKAGE_ID}`);
@@ -353,6 +348,7 @@ async function main() {
 
     // List on Sui
     const txDigest = await listDatasetOnSui(
+      client,
       keypair,
       dataset,
       blobId,

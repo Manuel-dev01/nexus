@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { getSuiClient, formatSui, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, mistToSui } from '$lib/sui/config';
+  import { getSuiClient, formatSui, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, mistToSui, hasPurchasedListing } from '$lib/sui/config';
   import { downloadFromWalrus, verifyBlob, formatFileSize } from '$lib/walrus/client';
   import { detectWallets, connectWallet, signAndExecuteTransaction, truncateAddress, type WalletInfo } from '$lib/wallet/store';
 
@@ -28,6 +28,10 @@
   let downloading = $state(false);
   let verifying = $state(false);
   let verificationResult: { verified: boolean; sha256: string } | null = $state(null);
+  // Access gating: true once we've confirmed the connected wallet owns a
+  // DatasetAccess (or is the provider) for this listing.
+  let hasAccess = $state(false);
+  let purchaseSuccess: string | null = $state(null);
 
   let listingId = $derived(page.params.id);
 
@@ -39,11 +43,19 @@
     loading = true;
     error = null;
 
+    // Narrow the route param (string | undefined) to a concrete id before use.
+    const id = listingId;
+    if (!id) {
+      error = 'No dataset ID provided in the URL.';
+      loading = false;
+      return;
+    }
+
     try {
       const client = getSuiClient();
 
       const result = await client.getObject({
-        id: listingId,
+        id,
         options: {
           showContent: true,
           showOwner: true,
@@ -57,7 +69,7 @@
       const fields = result.data.content.fields as any;
 
       dataset = {
-        id: listingId,
+        id,
         name: fields.name,
         description: fields.description,
         category: fields.category,
@@ -107,7 +119,6 @@
       const tx = buildBuyDatasetTransaction({
         marketplaceId: MARKETPLACE_ID,
         listingId: dataset.id,
-        paymentCoinId: '0x0', // Will be resolved by wallet
         paymentAmount: dataset.price,
         clockId: '0x6',
       });
@@ -115,7 +126,9 @@
       // Sign and execute
       const result = await signAndExecuteTransaction(wallet, tx);
 
-      alert(`Purchase successful! TX: ${result.digest || result.transactionDigest}`);
+      // Purchase grants on-chain access — unlock the download immediately.
+      hasAccess = true;
+      purchaseSuccess = result.digest || result.transactionDigest || 'confirmed';
     } catch (err: any) {
       error = err.message || 'Purchase failed';
       console.error('Purchase error:', err);
@@ -129,6 +142,22 @@
     downloading = true;
     error = null;
     try {
+      // Access gate: require an on-chain DatasetAccess for this listing (or be
+      // the provider). Note: Walrus blobs are publicly addressable, so this
+      // enforces the *product* access right, not raw blob secrecy.
+      if (!hasAccess) {
+        const wallets = detectWallets();
+        if (wallets.length === 0) {
+          throw new Error('Connect a Sui wallet to download — access is gated by your on-chain DatasetAccess.');
+        }
+        const address = await connectWallet(wallets[0]);
+        const owns = address === dataset.provider || await hasPurchasedListing(address, dataset.id);
+        if (!owns) {
+          throw new Error('Purchase required: no DatasetAccess for this listing was found in your wallet.');
+        }
+        hasAccess = true;
+      }
+
       const result = await downloadFromWalrus(dataset.walrusBlobId, dataset.contentHash || undefined);
       const blob = new Blob([result.data]);
       const url = URL.createObjectURL(blob);
@@ -296,12 +325,18 @@
               {purchasing ? 'Processing...' : 'Purchase Dataset'}
             </button>
             <button onclick={handleDownload} disabled={downloading} class="btn btn--ghost" style="width: 100%; justify-content: center;">
-              {downloading ? 'Downloading...' : 'Download from Walrus'}
+              {downloading ? 'Downloading...' : hasAccess ? 'Download from Walrus' : 'Download (requires access)'}
             </button>
           {:else}
             <button onclick={handleDownload} disabled={downloading} class="btn btn--primary" style="width: 100%; justify-content: center;">
-              {downloading ? 'Downloading...' : 'Download Dataset'}
+              {downloading ? 'Downloading...' : hasAccess ? 'Download Dataset' : 'Download (requires access)'}
             </button>
+          {/if}
+
+          {#if purchaseSuccess}
+            <div class="alert" style="margin-top: var(--sp-4); border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent-deep); font-family: var(--mono); font-size: 12px; word-break: break-all;">
+              Purchase confirmed — access unlocked. TX: {purchaseSuccess}
+            </div>
           {/if}
 
           {#if error}

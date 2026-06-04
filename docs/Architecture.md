@@ -41,7 +41,7 @@ Nexus is a decentralized AI model and memory marketplace built on Sui. Data prov
 
 ### 1. Smart Contracts (Sui Move)
 
-**Package:** `0xd4121a4525729f9319db53d66967f0669a5eff6603009d346befe9bac5b74816`
+**Package:** `0x86208eab6fcdadc33273cc65fed9b43177d7c65105ef88134eb635652d258788`
 
 **Modules:**
 - `nexus_marketplace` — Core marketplace logic
@@ -186,15 +186,15 @@ AI Agent → MCP Server (stdio)
 **Network:** Sui Testnet (chain ID: `4c78adac`)
 
 **Deployed Objects:**
-- Package: `0xd4121a4525729f9319db53d66967f0669a5eff6603009d346befe9bac5b74816`
-- Marketplace: `0x7718f693693cac1637a972ae9a6cf14fdacb0d275a8c8b1aef34eb4b4dae1bce`
+- Package: `0x86208eab6fcdadc33273cc65fed9b43177d7c65105ef88134eb635652d258788`
+- Marketplace: `0xaea5cb73bb7d4b8a6cac69be6dbd7d736cf73ec62563ac87f125c4f0c45f30b2`
 
 **Existing Listings:**
 | Name | Category | Price | Blob ID |
 |------|----------|-------|---------|
-| LoRA-Weights | model-weights | 1 SUI | `81FtoDN5MhiLhm0gQBvAEpwEGj5woOWS6PkfFaQgTEE` |
-| FineTuning-Dataset | fine-tuning | 0.25 SUI | `Tzs6Sfk1aL4pysTUVxJRRjhf14TFJ4jY9VTNacFRz-U` |
-| GPT2-Embeddings | embeddings | 0.5 SUI | `CxrYYF3kB_Pv9na0JNXTbVohjkemkFI0wL4kqnCK9Ls` |
+| LoRA-Weights | model-weights | 1 SUI | `foce6UR-SRib69uQJf9i6NCbve6fzGZmxbtCr9WzVV8` |
+| FineTuning-Dataset | fine-tuning | 0.25 SUI | `aGir1MudixR_2MezEKRfKHzqwXkBzD1xd9iaFhamZQ0` |
+| GPT2-Embeddings | embeddings | 0.5 SUI | `K1Ib_CNCEr7rG9rOiPMYd3NGxiF9x4DtlLoHNJJjEy8` |
 
 ## Security Considerations
 

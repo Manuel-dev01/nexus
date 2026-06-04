@@ -141,7 +141,10 @@
     }
   }
 
-  let estimatedCost = $derived(file ? estimateUploadCost(file.size, 5) : 0);
+  let estimatedCost = $derived.by(() => {
+    const f = file;
+    return f ? estimateUploadCost(f.size, 5) : 0;
+  });
 </script>
 
 <svelte:head>
