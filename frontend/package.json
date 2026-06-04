@@ -4,10 +4,10 @@
 	"version": "0.1.0",
 	"type": "module",
 	"scripts": {
-		"dev": "vite dev",
-		"build": "vite build",
-		"vercel-build": "vite build",
-		"preview": "vite preview",
+		"dev": "npx vite dev",
+		"build": "npx vite build",
+		"vercel-build": "npx vite build",
+		"preview": "npx vite preview",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
