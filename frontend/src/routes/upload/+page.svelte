@@ -126,11 +126,14 @@
       <form onsubmit={e => { e.preventDefault(); handleSubmit(); }} class="space-y-8">
         <!-- File Upload -->
         <div>
-          <label class="block text-sm font-medium text-slate-300 mb-3">Dataset File</label>
+          <label for="file-input" class="block text-sm font-medium text-slate-300 mb-3">Dataset File</label>
           <div
+            role="button"
+            tabindex="0"
             ondrop={handleDrop}
             ondragover={handleDragOver}
             onclick={() => document.getElementById('file-input')?.click()}
+            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') document.getElementById('file-input')?.click(); }}
             class="glass rounded-2xl p-12 text-center cursor-pointer hover:border-nexus-500/30 transition-colors duration-200"
           >
             {#if file}
