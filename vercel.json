@@ -1,6 +1,6 @@
 {
   "framework": null,
   "buildCommand": "cd frontend && npm install && npx vite build",
-  "outputDirectory": "frontend/.vercel/output",
+  "outputDirectory": "frontend/build",
   "installCommand": "echo skip"
 }
