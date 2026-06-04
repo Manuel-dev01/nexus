@@ -1,8 +1,9 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { getSuiClient, formatSui, PACKAGE_ID } from '$lib/sui/config';
+  import { getSuiClient, formatSui, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, mistToSui } from '$lib/sui/config';
   import { downloadFromWalrus, verifyBlob, formatFileSize } from '$lib/walrus/client';
+  import { detectWallets, connectWallet, signAndExecuteTransaction, truncateAddress, type WalletInfo } from '$lib/wallet/store';
 
   interface Dataset {
     id: string;
@@ -82,10 +83,42 @@
     if (!dataset) return;
     purchasing = true;
     error = null;
+
     try {
-      alert('Purchase functionality requires wallet connection. Will be enabled after deployment.');
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Purchase failed';
+      // Check wallet
+      const wallets = detectWallets();
+      if (wallets.length === 0) {
+        throw new Error('No Sui wallet detected. Please install Sui Wallet browser extension.');
+      }
+
+      let wallet: WalletInfo;
+      try {
+        wallet = wallets[0];
+        await connectWallet(wallet);
+      } catch (err: any) {
+        throw new Error(`Wallet connection failed: ${err.message}`);
+      }
+
+      if (!PACKAGE_ID || !MARKETPLACE_ID) {
+        throw new Error('Smart contracts not deployed yet. Please deploy contracts first.');
+      }
+
+      // Build purchase PTB
+      const tx = buildBuyDatasetTransaction({
+        marketplaceId: MARKETPLACE_ID,
+        listingId: dataset.id,
+        paymentCoinId: '0x0', // Will be resolved by wallet
+        paymentAmount: dataset.price,
+        clockId: '0x6',
+      });
+
+      // Sign and execute
+      const result = await signAndExecuteTransaction(wallet, tx);
+
+      alert(`Purchase successful! TX: ${result.digest || result.transactionDigest}`);
+    } catch (err: any) {
+      error = err.message || 'Purchase failed';
+      console.error('Purchase error:', err);
     } finally {
       purchasing = false;
     }
@@ -126,10 +159,6 @@
     } finally {
       verifying = false;
     }
-  }
-
-  function truncateAddress(address: string): string {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
   }
 
   function formatDate(timestamp: number): string {

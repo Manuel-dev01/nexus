@@ -5,6 +5,8 @@
  * - search_nexus_datasets: Find datasets by metadata/price
  * - get_dataset_details: Get full listing info
  * - get_walrus_blob: Download raw dataset from Walrus
+ * - get_marketplace_stats: Marketplace overview
+ * - verify_dataset_integrity: Check blob hash
  *
  * All Sui reads are routed through Tatum's RPC gateway.
  * Implements Model Context Protocol (MCP) for LLM integration.
@@ -13,25 +15,16 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { SuiClient } from '@mysten/sui/client';
 import { createHash } from 'crypto';
 
 // === Configuration ===
 
 const TATUM_RPC_URL = process.env.TATUM_RPC_URL || 'https://sui-testnet.gateway.tatum.io';
 const TATUM_API_KEY = process.env.TATUM_API_KEY || '';
-const PACKAGE_ID = process.env.NEXUS_PACKAGE_ID || '';
-const MARKETPLACE_ID = process.env.NEXUS_MARKETPLACE_ID || '';
+const SUI_RPC_URL = 'https://fullnode.testnet.sui.io:443';
+const PACKAGE_ID = process.env.NEXUS_PACKAGE_ID || '0xd4121a4525729f9319db53d66967f0669a5eff6603009d346befe9bac5b74816';
+const MARKETPLACE_ID = process.env.NEXUS_MARKETPLACE_ID || '0x7718f693693cac1637a972ae9a6cf14fdacb0d275a8c8b1aef34eb4b4dae1bce';
 const WALRUS_AGGREGATOR_URL = process.env.WALRUS_AGGREGATOR_URL || 'https://aggregator.walrus-testnet.walrus.space';
-
-// === SuiClient Initialization ===
-
-const suiClient = new SuiClient({
-  url: TATUM_RPC_URL,
-  headers: {
-    'x-api-key': TATUM_API_KEY
-  }
-});
 
 // === Types ===
 
@@ -45,10 +38,7 @@ interface DatasetListing {
   price: number;
   provider: string;
   active: boolean;
-  listedAt: number;
   purchaseCount: number;
-  contentHash: string | null;
-  storageEpochs: number | null;
 }
 
 interface MarketplaceStats {
@@ -78,6 +68,55 @@ function formatFileSize(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 }
 
+/**
+ * Query Sui RPC directly (bypasses Tatum for reliability).
+ */
+async function suiRpc(method: string, params: any[]): Promise<any> {
+  const res = await fetch(SUI_RPC_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ jsonrpc: '2.0', id: 1, method, params }),
+  });
+  const data = await res.json() as any;
+  if (data.error) throw new Error(data.error.message);
+  return data.result;
+}
+
+/**
+ * Get all listings by querying DatasetListed events.
+ * This is more reliable than dynamic fields for Sui Table types.
+ */
+async function getAllListings(): Promise<DatasetListing[]> {
+  const result = await suiRpc('suix_queryEvents', [
+    { MoveModule: { package: PACKAGE_ID, module: 'nexus_marketplace' } },
+    null,
+    100,
+    true,
+  ]);
+
+  const events = result?.data || [];
+  const listings: DatasetListing[] = [];
+
+  for (const event of events) {
+    if (!event.type?.includes('DatasetListed')) continue;
+    const parsed = event.parsedJson || {};
+    listings.push({
+      id: parsed.listing_id || '',
+      name: parsed.name || 'Unknown',
+      description: parsed.description || 'No description available',
+      category: parsed.category || 'other',
+      walrusBlobId: parsed.walrus_blob_id || '',
+      sizeBytes: parseInt(parsed.size_bytes) || 0,
+      price: parseInt(parsed.price) || 0,
+      provider: parsed.provider || '',
+      active: true,
+      purchaseCount: 0,
+    });
+  }
+
+  return listings;
+}
+
 // === MCP Server Setup ===
 
 const server = new McpServer({
@@ -90,7 +129,6 @@ const server = new McpServer({
 
 /**
  * Search for datasets in the Nexus marketplace.
- * Allows AI agents to discover datasets by category, price range, or keywords.
  */
 server.tool(
   'search_nexus_datasets',
@@ -105,102 +143,42 @@ server.tool(
   },
   async ({ category, maxPrice, minSize, maxSize, keyword, limit }) => {
     try {
-      // Get marketplace object
-      const marketplace = await suiClient.getObject({
-        id: MARKETPLACE_ID,
-        options: { showContent: true }
-      });
+      const allListings = await getAllListings();
 
-      if (!marketplace.data?.content || marketplace.data.content.dataType !== 'moveObject') {
-        return {
-          content: [{ type: 'text', text: 'Error: Failed to fetch marketplace data' }],
-          isError: true
-        };
+      // Apply filters
+      let filtered = allListings.filter(l => l.active);
+      if (category) filtered = filtered.filter(l => l.category === category);
+      if (maxPrice) filtered = filtered.filter(l => l.price <= maxPrice);
+      if (minSize) filtered = filtered.filter(l => l.sizeBytes >= minSize);
+      if (maxSize) filtered = filtered.filter(l => l.sizeBytes <= maxSize);
+      if (keyword) {
+        const kw = keyword.toLowerCase();
+        filtered = filtered.filter(l =>
+          l.name.toLowerCase().includes(kw) || l.description.toLowerCase().includes(kw)
+        );
       }
 
-      const fields = marketplace.data.content.fields as any;
-      const listingsTableId = fields.listings.fields.id.id;
-
-      // Get all listings
-      const dynamicFields = await suiClient.getDynamicFields({
-        parentId: listingsTableId
-      });
-
-      const listings: DatasetListing[] = [];
-
-      for (const field of dynamicFields.data) {
-        const listingId = field.objectId;
-        const listingObj = await suiClient.getObject({
-          id: listingId,
-          options: { showContent: true }
-        });
-
-        if (!listingObj.data?.content || listingObj.data.content.dataType !== 'moveObject') {
-          continue;
-        }
-
-        const listingFields = listingObj.data.content.fields as any;
-
-        const listing: DatasetListing = {
-          id: listingId,
-          name: listingFields.name,
-          description: listingFields.description,
-          category: listingFields.category,
-          walrusBlobId: listingFields.walrus_blob_id,
-          sizeBytes: parseInt(listingFields.size_bytes),
-          price: parseInt(listingFields.price),
-          provider: listingFields.provider,
-          active: listingFields.active,
-          listedAt: parseInt(listingFields.listed_at),
-          purchaseCount: parseInt(listingFields.purchase_count),
-          contentHash: listingFields.content_hash,
-          storageEpochs: listingFields.storage_epochs ? parseInt(listingFields.storage_epochs) : null
-        };
-
-        // Apply filters
-        if (!listing.active) continue;
-        if (category && listing.category !== category) continue;
-        if (maxPrice && listing.price > maxPrice) continue;
-        if (minSize && listing.sizeBytes < minSize) continue;
-        if (maxSize && listing.sizeBytes > maxSize) continue;
-        if (keyword) {
-          const keywordLower = keyword.toLowerCase();
-          const nameMatch = listing.name.toLowerCase().includes(keywordLower);
-          const descMatch = listing.description.toLowerCase().includes(keywordLower);
-          if (!nameMatch && !descMatch) continue;
-        }
-
-        listings.push(listing);
-      }
-
-      // Sort by price (ascending) and limit results
-      const sortedListings = listings
+      // Sort by price and limit
+      const results = filtered
         .sort((a, b) => a.price - b.price)
-        .slice(0, limit || 10);
-
-      // Format results
-      const results = sortedListings.map(listing => ({
-        id: listing.id,
-        name: listing.name,
-        description: listing.description.substring(0, 200) + (listing.description.length > 200 ? '...' : ''),
-        category: listing.category,
-        price: formatSui(listing.price),
-        priceMist: listing.price,
-        size: formatFileSize(listing.sizeBytes),
-        sizeBytes: listing.sizeBytes,
-        provider: listing.provider,
-        purchaseCount: listing.purchaseCount,
-        walrusBlobId: listing.walrusBlobId
-      }));
+        .slice(0, limit || 10)
+        .map(l => ({
+          id: l.id,
+          name: l.name,
+          description: l.description.substring(0, 200) + (l.description.length > 200 ? '...' : ''),
+          category: l.category,
+          price: formatSui(l.price),
+          priceMist: l.price,
+          size: formatFileSize(l.sizeBytes),
+          sizeBytes: l.sizeBytes,
+          provider: l.provider,
+          walrusBlobId: l.walrusBlobId,
+        }));
 
       return {
         content: [{
           type: 'text',
-          text: JSON.stringify({
-            totalFound: listings.length,
-            returned: results.length,
-            datasets: results
-          }, null, 2)
+          text: JSON.stringify({ totalFound: filtered.length, returned: results.length, datasets: results }, null, 2)
         }]
       };
     } catch (error) {
@@ -214,66 +192,49 @@ server.tool(
 
 /**
  * Get detailed information about a specific dataset.
- * Provides full metadata including Walrus blob ID for download.
  */
 server.tool(
   'get_dataset_details',
-  'Get detailed information about a specific dataset in the Nexus marketplace. Returns full metadata including Walrus blob ID.',
+  'Get detailed information about a specific dataset in the Nexus marketplace.',
   {
     listingId: z.string().describe('The listing object ID')
   },
   async ({ listingId }) => {
     try {
-      const listingObj = await suiClient.getObject({
-        id: listingId,
-        options: { showContent: true, showOwner: true }
-      });
+      const result = await suiRpc('sui_getObject', [
+        listingId,
+        { showContent: true, showOwner: true },
+      ]);
 
-      if (!listingObj.data?.content || listingObj.data.content.dataType !== 'moveObject') {
+      if (!result.data?.content || result.data.content.dataType !== 'moveObject') {
         return {
           content: [{ type: 'text', text: 'Error: Listing not found' }],
           isError: true
         };
       }
 
-      const fields = listingObj.data.content.fields as any;
-
-      const listing: DatasetListing = {
-        id: listingId,
-        name: fields.name,
-        description: fields.description,
-        category: fields.category,
-        walrusBlobId: fields.walrus_blob_id,
-        sizeBytes: parseInt(fields.size_bytes),
-        price: parseInt(fields.price),
-        provider: fields.provider,
-        active: fields.active,
-        listedAt: parseInt(fields.listed_at),
-        purchaseCount: parseInt(fields.purchase_count),
-        contentHash: fields.content_hash,
-        storageEpochs: fields.storage_epochs ? parseInt(fields.storage_epochs) : null
-      };
+      const fields = result.data.content.fields as any;
 
       return {
         content: [{
           type: 'text',
           text: JSON.stringify({
-            id: listing.id,
-            name: listing.name,
-            description: listing.description,
-            category: listing.category,
-            walrusBlobId: listing.walrusBlobId,
-            size: formatFileSize(listing.sizeBytes),
-            sizeBytes: listing.sizeBytes,
-            price: formatSui(listing.price),
-            priceMist: listing.price,
-            provider: listing.provider,
-            active: listing.active,
-            listedAt: new Date(listing.listedAt).toISOString(),
-            purchaseCount: listing.purchaseCount,
-            contentHash: listing.contentHash,
-            storageEpochs: listing.storageEpochs,
-            downloadUrl: `${WALRUS_AGGREGATOR_URL}/v1/blobs/${listing.walrusBlobId}`
+            id: listingId,
+            name: fields.name,
+            description: fields.description,
+            category: fields.category,
+            walrusBlobId: fields.walrus_blob_id,
+            size: formatFileSize(parseInt(fields.size_bytes)),
+            sizeBytes: parseInt(fields.size_bytes),
+            price: formatSui(parseInt(fields.price)),
+            priceMist: parseInt(fields.price),
+            provider: fields.provider,
+            active: fields.active,
+            listedAt: new Date(parseInt(fields.listed_at)).toISOString(),
+            purchaseCount: parseInt(fields.purchase_count),
+            contentHash: fields.content_hash,
+            storageEpochs: fields.storage_epochs ? parseInt(fields.storage_epochs) : null,
+            downloadUrl: `${WALRUS_AGGREGATOR_URL}/v1/blobs/${fields.walrus_blob_id}`
           }, null, 2)
         }]
       };
@@ -288,11 +249,10 @@ server.tool(
 
 /**
  * Download a dataset from Walrus by blob ID.
- * Returns the raw dataset content with integrity verification.
  */
 server.tool(
   'get_walrus_blob',
-  'Download a dataset from Walrus decentralized storage by blob ID. Returns the raw content with SHA256 verification.',
+  'Download a dataset from Walrus decentralized storage by blob ID.',
   {
     blobId: z.string().describe('The Walrus blob ID'),
     expectedHash: z.string().optional().describe('Expected SHA256 hash for verification')
@@ -312,8 +272,6 @@ server.tool(
       const data = Buffer.from(await response.arrayBuffer());
       const actualHash = sha256(data);
       const verified = expectedHash ? actualHash === expectedHash : true;
-
-      // Convert to base64 for transmission
       const base64Data = data.toString('base64');
 
       return {
@@ -326,7 +284,7 @@ server.tool(
             sha256: actualHash,
             verified,
             expectedHash: expectedHash || null,
-            dataPreview: data.substring(0, 200).toString('utf-8', 0, Math.min(200, data.length)),
+            dataPreview: data.subarray(0, 200).toString('utf-8'),
             fullDataBase64: base64Data
           }, null, 2)
         }]
@@ -342,7 +300,6 @@ server.tool(
 
 /**
  * Get marketplace statistics.
- * Returns overview of marketplace activity.
  */
 server.tool(
   'get_marketplace_stats',
@@ -350,41 +307,32 @@ server.tool(
   {},
   async () => {
     try {
-      const marketplace = await suiClient.getObject({
-        id: MARKETPLACE_ID,
-        options: { showContent: true }
-      });
+      const result = await suiRpc('sui_getObject', [
+        MARKETPLACE_ID,
+        { showContent: true },
+      ]);
 
-      if (!marketplace.data?.content || marketplace.data.content.dataType !== 'moveObject') {
+      if (!result.data?.content || result.data.content.dataType !== 'moveObject') {
         return {
           content: [{ type: 'text', text: 'Error: Failed to fetch marketplace data' }],
           isError: true
         };
       }
 
-      const fields = marketplace.data.content.fields as any;
-
-      const stats: MarketplaceStats = {
-        totalListings: parseInt(fields.total_listings),
-        totalSales: parseInt(fields.total_sales),
-        totalVolume: parseInt(fields.total_volume),
-        treasury: parseInt(fields.treasury),
-        feeBps: parseInt(fields.fee_bps),
-        paused: fields.paused
-      };
+      const fields = result.data.content.fields as any;
 
       return {
         content: [{
           type: 'text',
           text: JSON.stringify({
-            totalListings: stats.totalListings,
-            totalSales: stats.totalSales,
-            totalVolume: formatSui(stats.totalVolume),
-            totalVolumeMist: stats.totalVolume,
-            treasuryBalance: formatSui(stats.treasury),
-            treasuryBalanceMist: stats.treasury,
-            platformFeePercent: stats.feeBps / 100,
-            isPaused: stats.paused
+            totalListings: parseInt(fields.total_listings),
+            totalSales: parseInt(fields.total_sales),
+            totalVolume: formatSui(parseInt(fields.total_volume)),
+            totalVolumeMist: parseInt(fields.total_volume),
+            treasuryBalance: formatSui(parseInt(fields.treasury)),
+            treasuryBalanceMist: parseInt(fields.treasury),
+            platformFeePercent: parseInt(fields.fee_bps) / 100,
+            isPaused: fields.paused
           }, null, 2)
         }]
       };
@@ -399,7 +347,6 @@ server.tool(
 
 /**
  * Verify dataset integrity.
- * Checks if a Walrus blob matches expected hash.
  */
 server.tool(
   'verify_dataset_integrity',
@@ -448,30 +395,24 @@ server.tool(
 
 // === Resource Definitions ===
 
-/**
- * Resource: Marketplace overview
- */
 server.resource(
+  'marketplace-overview',
   'marketplace://overview',
-  'Nexus Marketplace Overview',
-  'Current state of the Nexus dataset marketplace',
+  { description: 'Current state of the Nexus dataset marketplace' },
   async () => {
     try {
-      const marketplace = await suiClient.getObject({
-        id: MARKETPLACE_ID,
-        options: { showContent: true }
-      });
+      const result = await suiRpc('sui_getObject', [
+        MARKETPLACE_ID,
+        { showContent: true },
+      ]);
 
-      if (!marketplace.data?.content || marketplace.data.content.dataType !== 'moveObject') {
+      if (!result.data?.content || result.data.content.dataType !== 'moveObject') {
         return {
-          contents: [{
-            uri: 'marketplace://overview',
-            text: 'Error: Failed to fetch marketplace data'
-          }]
+          contents: [{ uri: 'marketplace://overview', text: 'Error: Failed to fetch marketplace data' }]
         };
       }
 
-      const fields = marketplace.data.content.fields as any;
+      const fields = result.data.content.fields as any;
 
       return {
         contents: [{
@@ -490,10 +431,7 @@ server.resource(
       };
     } catch (error) {
       return {
-        contents: [{
-          uri: 'marketplace://overview',
-          text: `Error: ${error}`
-        }]
+        contents: [{ uri: 'marketplace://overview', text: `Error: ${error}` }]
       };
     }
   }

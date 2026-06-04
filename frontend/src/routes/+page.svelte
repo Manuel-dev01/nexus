@@ -40,52 +40,43 @@
     error = null;
 
     try {
-      const client = getSuiClient();
-
-      const marketplace = await client.getObject({
-        id: MARKETPLACE_ID,
-        options: { showContent: true },
+      // Use event-based approach to discover listings
+      const res = await fetch('https://fullnode.testnet.sui.io:443', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'suix_queryEvents',
+          params: [
+            { MoveModule: { package: PACKAGE_ID, module: 'nexus_marketplace' } },
+            null,
+            50,
+            true,
+          ],
+        }),
       });
 
-      if (!marketplace.data?.content || marketplace.data.content.dataType !== 'moveObject') {
-        throw new Error('Failed to fetch marketplace');
-      }
-
-      const fields = marketplace.data.content.fields as any;
-      const listingsTableId = fields.listings.fields.id.id;
-
-      const dynamicFields = await client.getDynamicFields({
-        parentId: listingsTableId,
-      });
+      const data = await res.json() as any;
+      const events = data.result?.data || [];
 
       const loadedDatasets: Dataset[] = [];
 
-      for (const field of dynamicFields.data) {
-        const listingId = field.objectId;
-        const listingObj = await client.getObject({
-          id: listingId,
-          options: { showContent: true },
-        });
+      for (const event of events) {
+        if (!event.type?.includes('DatasetListed')) continue;
 
-        if (!listingObj.data?.content || listingObj.data.content.dataType !== 'moveObject') {
-          continue;
-        }
-
-        const listingFields = listingObj.data.content.fields as any;
-
-        if (!listingFields.active) continue;
-
+        const parsed = event.parsedJson || {};
         loadedDatasets.push({
-          id: listingId,
-          name: listingFields.name,
-          description: listingFields.description,
-          category: listingFields.category,
-          walrusBlobId: listingFields.walrus_blob_id,
-          sizeBytes: parseInt(listingFields.size_bytes),
-          price: parseInt(listingFields.price),
-          provider: listingFields.provider,
-          active: listingFields.active,
-          purchaseCount: parseInt(listingFields.purchase_count),
+          id: parsed.listing_id || '',
+          name: parsed.name || 'Unknown',
+          description: parsed.description || 'No description available',
+          category: parsed.category || 'other',
+          walrusBlobId: parsed.walrus_blob_id || '',
+          sizeBytes: parseInt(parsed.size_bytes) || 0,
+          price: parseInt(parsed.price) || 0,
+          provider: parsed.provider || '',
+          active: true,
+          purchaseCount: 0,
         });
       }
 

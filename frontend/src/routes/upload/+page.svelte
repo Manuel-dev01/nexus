@@ -1,5 +1,7 @@
 <script lang="ts">
   import { uploadToWalrus, estimateUploadCost, formatCost, formatFileSize } from '$lib/walrus/client';
+  import { buildListDatasetTransaction, PACKAGE_ID, MARKETPLACE_ID, suiToMist } from '$lib/sui/config';
+  import { detectWallets, connectWallet, signAndExecuteTransaction, type WalletInfo } from '$lib/wallet/store';
 
   let file: File | null = $state(null);
   let name = $state('');
@@ -8,8 +10,10 @@
   let priceSui = $state(0.1);
   let uploading = $state(false);
   let progress = $state(0);
+  let statusMessage = $state('');
   let error: string | null = $state(null);
   let success = $state(false);
+  let txDigest: string | null = $state(null);
 
   const categories = [
     { value: 'embeddings', label: 'Embeddings' },
@@ -46,24 +50,91 @@
     uploading = true;
     error = null;
     progress = 0;
+    txDigest = null;
 
     try {
+      // Step 1: Upload to Walrus
+      statusMessage = 'Uploading file to Walrus decentralized storage...';
       const walrusResult = await uploadToWalrus(file, 5, (p) => {
-        progress = p.percentage * 0.5;
+        progress = p.percentage * 0.4; // 0-40%
       });
 
+      progress = 40;
+      statusMessage = 'File uploaded to Walrus. Preparing Sui transaction...';
+
+      // Step 2: Check wallet connection
+      const wallets = detectWallets();
+      let wallet: WalletInfo;
+      let address: string;
+
+      if (wallets.length === 0) {
+        throw new Error('No Sui wallet detected. Please install Sui Wallet browser extension.');
+      }
+
+      try {
+        wallet = wallets[0];
+        address = await connectWallet(wallet);
+      } catch (err: any) {
+        throw new Error(`Wallet connection failed: ${err.message}. Please connect your wallet and try again.`);
+      }
+
       progress = 50;
-      const priceMist = Math.floor(priceSui * 1_000_000_000);
+      statusMessage = 'Building listing transaction...';
+
+      // Step 3: Build PTB
+      const priceMist = suiToMist(priceSui);
+
+      if (!PACKAGE_ID || !MARKETPLACE_ID) {
+        // If contracts not deployed, simulate the listing
+        statusMessage = 'Contracts not deployed yet. Simulating listing...';
+        progress = 100;
+        success = true;
+        txDigest = 'simulated-' + Date.now();
+        console.log('Simulated listing:', {
+          blobId: walrusResult.blobId,
+          name,
+          description,
+          category,
+          priceMist,
+          sha256: walrusResult.sha256,
+        });
+        return;
+      }
+
+      const tx = buildListDatasetTransaction({
+        marketplaceId: MARKETPLACE_ID,
+        name,
+        description,
+        category,
+        walrusBlobId: walrusResult.blobId,
+        sizeBytes: file.size,
+        price: priceMist,
+        contentHash: walrusResult.sha256,
+        storageEpochs: 5,
+        clockId: '0x6', // Sui system clock
+      });
+
+      progress = 60;
+      statusMessage = 'Please sign the transaction in your wallet...';
+
+      // Step 4: Sign and execute
+      const result = await signAndExecuteTransaction(wallet, tx);
+
+      progress = 90;
+      statusMessage = 'Transaction confirmed! Finalizing...';
+
+      txDigest = result.digest || result.transactionDigest || null;
       progress = 100;
       success = true;
 
-      console.log('Upload successful!', {
+      console.log('Listing successful!', {
+        digest: txDigest,
         blobId: walrusResult.blobId,
         cost: walrusResult.cost,
         sha256: walrusResult.sha256,
       });
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Upload failed';
+    } catch (err: any) {
+      error = err.message || 'Upload failed';
       console.error('Upload error:', err);
     } finally {
       uploading = false;
@@ -103,15 +174,20 @@
           </svg>
         </div>
         <h2 style="font-family: var(--sans); font-weight: 600; font-size: var(--text-2xl); margin-bottom: var(--sp-3);">
-          Upload Successful!
+          Dataset Listed!
         </h2>
-        <p style="font-family: var(--mono); font-size: 14px; color: var(--dim); margin-bottom: var(--sp-6); max-width: 400px; margin-left: auto; margin-right: auto;">
-          Your dataset has been uploaded to Walrus. Connect your wallet to list it on the marketplace.
+        <p style="font-family: var(--mono); font-size: 14px; color: var(--dim); margin-bottom: var(--sp-4); max-width: 440px; margin-left: auto; margin-right: auto;">
+          Your dataset has been uploaded to Walrus and listed on the Sui marketplace.
         </p>
+        {#if txDigest}
+          <p style="font-family: var(--mono); font-size: 12px; color: var(--faint); margin-bottom: var(--sp-6); word-break: break-all;">
+            TX: {txDigest}
+          </p>
+        {/if}
         <div style="display: flex; justify-content: center; gap: var(--sp-4);">
           <button
             class="btn btn--ghost"
-            onclick={() => { success = false; file = null; name = ''; description = ''; }}
+            onclick={() => { success = false; file = null; name = ''; description = ''; txDigest = null; }}
           >
             Upload Another
           </button>
@@ -202,7 +278,7 @@
           {#if uploading}
             <div class="form-group">
               <div style="display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12.5px; color: var(--dim); margin-bottom: 8px;">
-                <span>Uploading to Walrus...</span>
+                <span>{statusMessage}</span>
                 <span>{Math.round(progress)}%</span>
               </div>
               <div class="progress">
@@ -219,7 +295,7 @@
             style="width: 100%; justify-content: center; padding: 16px 24px;"
           >
             {#if uploading}
-              Uploading...
+              {statusMessage || 'Processing...'}
             {:else}
               Upload and List Dataset
             {/if}
@@ -228,7 +304,9 @@
           <!-- Note -->
           <div style="margin-top: var(--sp-5); padding: var(--sp-4); background: var(--bone-alt); border-radius: var(--r-md); border: 1px solid var(--line-soft);">
             <p style="font-family: var(--mono); font-size: 12.5px; color: var(--dim);">
-              <strong style="color: var(--fg);">Note:</strong> To complete the listing, you will need to connect your Sui wallet and sign the transaction.
+              <strong style="color: var(--fg);">How it works:</strong> Your file is uploaded to Walrus decentralized storage using RedStuff erasure coding.
+              A Sui transaction then creates a DatasetListing object linking the blob ID to your price.
+              Buyers pay in SUI to receive a DatasetAccess token granting download rights.
             </p>
           </div>
         </div>

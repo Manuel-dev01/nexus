@@ -58,13 +58,13 @@ Nexus flips this model:
 +--------------------------------------------------------------+
 ```
 
+> For a detailed architecture breakdown, see [docs/Architecture.md](docs/Architecture.md).
+
 ---
 
 ## Live Demo
 
 **Frontend:** https://nexus-l6qjs42ha-manuel-dev01s-projects.vercel.app
-
-**Landing Page:** See `nexus-landing/index.html` in the repository root.
 
 **Deployed Contracts (Sui Testnet):**
 
@@ -98,6 +98,8 @@ Nexus uses **Walrus** as its backbone for storing massive AI datasets. Instead o
 
 **Why Walrus?** Traditional IPFS pinning is unreliable. Centralized storage defeats decentralization. Walrus provides guaranteed availability through economic incentives and erasure coding, making it ideal for datasets that must be reliably available for AI agents purchasing access.
 
+> For the full Walrus API reference, see [docs/API.md](docs/API.md).
+
 ---
 
 ## Tatum Integration (RPC Gateway + MCP)
@@ -127,6 +129,8 @@ Nexus implements a **custom MCP server** that exposes domain-specific tools for 
 | `verify_dataset_integrity` | Verify blob hash matches expected | Walrus Aggregator |
 
 The Tatum `@tatumio/blockchain-mcp` server runs alongside for generic blockchain data (wallet balances, transaction history, etc.).
+
+> For the full API reference, see [docs/API.md](docs/API.md).
 
 ---
 
@@ -193,34 +197,53 @@ cd ../frontend && npm install && npm run dev
 cd ../mcp-server && npm install && npm start
 ```
 
+> For full deployment instructions, see [docs/Deployment.md](docs/Deployment.md).
+
+---
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Architecture](docs/Architecture.md) | System architecture, data flows, security model |
+| [API Reference](docs/API.md) | Smart contract API, Walrus API, MCP tools, Sui RPC |
+| [Deployment Guide](docs/Deployment.md) | Contract deployment, frontend deploy, MCP server setup |
+| [Demo & Verification Flow](docs/Demo-Verification-Flow.md) | Step-by-step guide to verify and demo all features |
+
 ---
 
 ## Repository Structure
 
 ```
 nexus/
-+-- .agents/                        # Architecture decisions and task tracking
-+-- antigravity.md                  # Engineering manual (source of truth)
-+-- README.md                       # You are here
-+-- .env.example                    # Environment template
++-- docs/                           # Project documentation
+|   +-- Architecture.md             # System architecture
+|   +-- API.md                      # API reference
+|   +-- Deployment.md               # Deployment guide
+|   +-- Demo-Verification-Flow.md   # Demo and verification guide
 +-- move/                           # Sui Smart Contracts
 |   +-- Move.toml
 |   +-- sources/
 |   |   +-- nexus_marketplace.move  # Core marketplace logic
 |   |   +-- nexus_events.move       # Event definitions
-|   +-- tests/
-+-- frontend/                       # SvelteKit App
+|   +-- tests/                      # Move unit tests
++-- frontend/                       # SvelteKit 2 App (Svelte 5)
 |   +-- src/
 |   |   +-- routes/                 # Pages: /, /upload, /dataset/[id]
 |   |   +-- lib/
+|   |       +-- wallet/             # Sui Wallet Standard integration
 |   |       +-- walrus/             # Walrus upload/download wrappers
 |   |       +-- sui/                # Tatum RPC config and PTB builders
+|   |       +-- components/         # Convergence mark SVG
 +-- mcp-server/                     # Nexus MCP Server (AI Agent layer)
 |   +-- package.json
 |   +-- src/index.ts                # Tool definitions
-+-- scripts/
-|   +-- seed_marketplace.ts         # Deterministic demo seeder
-|   +-- spike/walrus-spike.ts       # Infrastructure validation
++-- scripts/                        # Test and utility scripts
+|   +-- test-contracts.ts           # Contract E2E tests
+|   +-- test-mcp.ts                 # MCP server tests
+|   +-- e2e-test.ts                 # Frontend E2E tests
++-- .env.example                    # Environment template
++-- README.md                       # You are here
 ```
 
 ---
