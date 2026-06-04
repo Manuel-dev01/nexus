@@ -232,9 +232,8 @@ nexus/
 +-- move/                           # Sui Smart Contracts
 |   +-- Move.toml
 |   +-- sources/
-|   |   +-- nexus_marketplace.move  # Core marketplace logic
-|   |   +-- nexus_events.move       # Event definitions
-|   +-- tests/                      # Move unit tests
+|   |   +-- nexus_marketplace.move  # Core marketplace logic (objects, events, fees)
+|   +-- tests/                      # Move unit tests (12 tests)
 +-- frontend/                       # SvelteKit 2 App (Svelte 5)
 |   +-- src/
 |   |   +-- routes/                 # Pages: /, /upload, /dataset/[id]

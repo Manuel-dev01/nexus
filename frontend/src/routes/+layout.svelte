@@ -175,7 +175,14 @@
 <!-- Mobile Menu Overlay -->
 {#if mobileMenuOpen}
 	<div class="mobile-menu" role="dialog" aria-label="Navigation menu">
-		<div class="mobile-menu__backdrop" onclick={closeMobileMenu}></div>
+		<div
+			class="mobile-menu__backdrop"
+			role="button"
+			tabindex="0"
+			aria-label="Close navigation menu"
+			onclick={closeMobileMenu}
+			onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ' || e.key === 'Escape') closeMobileMenu(); }}
+		></div>
 		<div class="mobile-menu__panel">
 			<div class="mobile-menu__header">
 				<a href="/" class="nav__logo" onclick={closeMobileMenu}>

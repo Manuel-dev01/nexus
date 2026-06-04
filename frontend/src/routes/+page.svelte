@@ -334,7 +334,7 @@
     </p>
     <div class="cta__actions">
       <a href="/upload" class="btn btn--primary">Upload Dataset &rarr;</a>
-      <a href="#" class="btn btn--ghost">For developers</a>
+      <a href="https://github.com/Manuel-dev01/nexus/tree/master/docs" target="_blank" rel="noopener noreferrer" class="btn btn--ghost">For developers</a>
     </div>
   </div>
 </section>

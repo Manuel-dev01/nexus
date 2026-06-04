@@ -44,8 +44,7 @@ Nexus is a decentralized AI model and memory marketplace built on Sui. Data prov
 **Package:** `0x86208eab6fcdadc33273cc65fed9b43177d7c65105ef88134eb635652d258788`
 
 **Modules:**
-- `nexus_marketplace` — Core marketplace logic
-- `nexus_events` — Event type definitions for indexing
+- `nexus_marketplace` — Core marketplace logic, including the `DatasetListed` / `DatasetPurchased` / `DatasetDelisted` events emitted for indexing
 
 **Objects:**
 

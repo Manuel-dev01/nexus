@@ -149,16 +149,6 @@ async function testPackageModules() {
     const modules = content.disassembled || {};
     if (!modules.nexus_marketplace) throw new Error('nexus_marketplace module not found');
   });
-
-  await test('Package contains nexus_events module', async () => {
-    const result = await rpcCall('sui_getObject', [
-      PACKAGE_ID,
-      { showContent: true },
-    ]);
-    const content = result.data?.content;
-    const modules = content?.disassembled || {};
-    if (!modules.nexus_events) throw new Error('nexus_events module not found');
-  });
 }
 
 async function testEventQuerying() {

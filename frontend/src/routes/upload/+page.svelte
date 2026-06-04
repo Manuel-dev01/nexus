@@ -204,7 +204,7 @@
         <div class="upload-form">
           <!-- File Upload -->
           <div class="form-group">
-            <label class="form-label">Dataset File</label>
+            <label class="form-label" for="file-input">Dataset File</label>
             <div
               role="button"
               tabindex="0"
