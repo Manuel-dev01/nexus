@@ -1,6 +1,6 @@
 {
   "framework": null,
-  "buildCommand": "npx vite build",
-  "outputDirectory": ".vercel/output",
-  "installCommand": "npm install"
+  "buildCommand": "npm install --include=dev && npx vite build",
+  "outputDirectory": "build",
+  "installCommand": "echo skip"
 }
