@@ -16,11 +16,11 @@
     purchaseCount: number;
   }
 
-  let datasets: Dataset[] = [];
-  let loading = true;
-  let error: string | null = null;
-  let filterCategory = 'all';
-  let sortBy = 'price-asc';
+  let datasets: Dataset[] = $state([]);
+  let loading = $state(true);
+  let error: string | null = $state(null);
+  let filterCategory = $state('all');
+  let sortBy = $state('price-asc');
 
   const categories = [
     { value: 'all', label: 'All Categories' },
@@ -128,7 +128,7 @@
   <meta name="description" content="Decentralized marketplace for AI training datasets stored on Walrus" />
 </svelte:head>
 
-<div class="gradient-bg min-h-screen">
+<div class="gradient-bg min-h-screen overflow-x-hidden">
   <!-- Hero Section -->
   <section class="relative overflow-hidden">
     <!-- Background orbs -->

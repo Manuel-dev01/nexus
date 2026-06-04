@@ -3,15 +3,15 @@
   import { uploadToWalrus, estimateUploadCost, formatCost, formatFileSize } from '$lib/walrus/client';
   import { buildListDatasetTransaction, getSuiClient, PACKAGE_ID, MARKETPLACE_ID } from '$lib/sui/config';
 
-  let file: File | null = null;
-  let name = '';
-  let description = '';
-  let category = 'embeddings';
-  let priceSui = 0.1;
-  let uploading = false;
-  let progress = 0;
-  let error: string | null = null;
-  let success = false;
+  let file: File | null = $state(null);
+  let name = $state('');
+  let description = $state('');
+  let category = $state('embeddings');
+  let priceSui = $state(0.1);
+  let uploading = $state(false);
+  let progress = $state(0);
+  let error: string | null = $state(null);
+  let success = $state(false);
 
   const categories = [
     { value: 'embeddings', label: 'Embeddings' },
@@ -80,7 +80,7 @@
   <title>Upload Dataset — Nexus</title>
 </svelte:head>
 
-<div class="gradient-bg min-h-screen">
+<div class="gradient-bg min-h-screen overflow-x-hidden">
   <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
     <!-- Header -->
     <div class="mb-12">

@@ -20,13 +20,13 @@
     storageEpochs: number | null;
   }
 
-  let dataset: Dataset | null = null;
-  let loading = true;
-  let error: string | null = null;
-  let purchasing = false;
-  let downloading = false;
-  let verifying = false;
-  let verificationResult: { verified: boolean; sha256: string } | null = null;
+  let dataset: Dataset | null = $state(null);
+  let loading = $state(true);
+  let error: string | null = $state(null);
+  let purchasing = $state(false);
+  let downloading = $state(false);
+  let verifying = $state(false);
+  let verificationResult: { verified: boolean; sha256: string } | null = $state(null);
 
   let listingId = $derived($page.params.id);
 
@@ -153,7 +153,7 @@
   <title>{dataset?.name || 'Dataset'} — Nexus</title>
 </svelte:head>
 
-<div class="gradient-bg min-h-screen">
+<div class="gradient-bg min-h-screen overflow-x-hidden">
   <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
     <!-- Back Link -->
     <a href="/" class="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-white transition-colors mb-8">
