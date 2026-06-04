@@ -111,10 +111,6 @@
   <div class="hero__inner">
     <div class="hero__grid">
       <div>
-        <div class="hero__badge">
-          <span class="hero__badge-dot"></span>
-          Decentralized AI Data Marketplace
-        </div>
         <h1 class="hero__title">
           Memory, for
           <br />
