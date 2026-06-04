@@ -1,6 +1,5 @@
 {
-  "buildCommand": "npm run build",
+  "buildCommand": "npx vite build",
   "outputDirectory": ".svelte-kit/output",
-  "framework": "sveltekit",
   "installCommand": "npm install"
 }
