@@ -5,7 +5,8 @@
  * Provides SuiClient initialization and PTB builders for marketplace operations.
  */
 
-import { CoreClient } from '@mysten/sui/client';
+import { SuiJsonRpcClient } from '@mysten/sui/jsonRpc';
+import { JsonRpcHTTPTransport } from '@mysten/sui/jsonRpc';
 import { Transaction } from '@mysten/sui/transactions';
 
 // === Configuration ===
@@ -26,27 +27,34 @@ export const MARKETPLACE_ID = import.meta.env.PUBLIC_NEXUS_MARKETPLACE_ID || '';
 // === SuiClient Initialization ===
 
 /**
- * Create a CoreClient instance configured to use Tatum's RPC gateway.
+ * Create a SuiJsonRpcClient configured to use Tatum's RPC gateway.
  * All Sui RPC calls will be routed through Tatum.
  *
- * @returns CoreClient instance
+ * @returns SuiJsonRpcClient instance
  */
-export function createSuiClient(): CoreClient {
-  return new CoreClient({
+export function createSuiClient(): SuiJsonRpcClient {
+  const transport = new JsonRpcHTTPTransport({
     url: TATUM_RPC_URL,
-    headers: {
-      'x-api-key': TATUM_API_KEY
+    rpc: {
+      headers: {
+        'x-api-key': TATUM_API_KEY
+      }
     }
+  });
+
+  return new SuiJsonRpcClient({
+    transport,
+    network: NETWORK as 'testnet' | 'mainnet' | 'devnet',
   });
 }
 
 /**
- * Get a singleton CoreClient instance.
+ * Get a singleton SuiJsonRpcClient instance.
  * Reuses the same client across the application.
  */
-let clientInstance: CoreClient | null = null;
+let clientInstance: SuiJsonRpcClient | null = null;
 
-export function getSuiClient(): CoreClient {
+export function getSuiClient(): SuiJsonRpcClient {
   if (!clientInstance) {
     clientInstance = createSuiClient();
   }

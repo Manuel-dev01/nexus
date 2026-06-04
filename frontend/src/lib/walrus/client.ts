@@ -6,8 +6,6 @@
  * and blob lifecycle management.
  */
 
-import { createHash } from 'crypto';
-
 // === Configuration ===
 
 export const WALRUS_PUBLISHER_URL = import.meta.env.PUBLIC_WALRUS_PUBLISHER_URL
@@ -63,10 +61,10 @@ export type UploadProgressCallback = (progress: UploadProgress) => void;
 
 // === Utility Functions ===
 
-function sha256(data: ArrayBuffer): string {
-  const hash = createHash('sha256');
-  hash.update(Buffer.from(data));
-  return hash.digest('hex');
+async function sha256(data: ArrayBuffer): Promise<string> {
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
 }
 
 function formatMist(mist: number): string {
@@ -96,7 +94,7 @@ export async function uploadToWalrus(
   const fileSize = fileBuffer.byteLength;
 
   // Calculate hash before upload
-  const fileHash = sha256(fileBuffer);
+  const fileHash = await sha256(fileBuffer);
 
   // Create XMLHttpRequest for progress tracking
   return new Promise((resolve, reject) => {
@@ -188,7 +186,7 @@ export async function downloadFromWalrus(
   }
 
   const data = await response.arrayBuffer();
-  const actualHash = sha256(data);
+  const actualHash = await sha256(data);
   const verified = expectedHash ? actualHash === expectedHash : true;
 
   return {

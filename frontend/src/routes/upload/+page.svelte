@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { goto } from '$app/navigation';
   import { uploadToWalrus, estimateUploadCost, formatCost, formatFileSize } from '$lib/walrus/client';
-  import { buildListDatasetTransaction, getSuiClient, PACKAGE_ID, MARKETPLACE_ID } from '$lib/sui/config';
 
   let file: File | null = $state(null);
   let name = $state('');
@@ -17,6 +15,8 @@
     { value: 'embeddings', label: 'Embeddings' },
     { value: 'fine-tuning', label: 'Fine-Tuning' },
     { value: 'model-weights', label: 'Model Weights' },
+    { value: 'language', label: 'Language' },
+    { value: 'vision', label: 'Vision' },
   ];
 
   function handleFileSelect(event: Event) {
@@ -53,9 +53,7 @@
       });
 
       progress = 50;
-
       const priceMist = Math.floor(priceSui * 1_000_000_000);
-
       progress = 100;
       success = true;
 
@@ -64,7 +62,6 @@
         cost: walrusResult.cost,
         sha256: walrusResult.sha256,
       });
-
     } catch (err) {
       error = err instanceof Error ? err.message : 'Upload failed';
       console.error('Upload error:', err);
@@ -80,192 +77,160 @@
   <title>Upload Dataset — Nexus</title>
 </svelte:head>
 
-<div class="gradient-bg min-h-screen overflow-x-hidden">
-  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
+<div class="section">
+  <div class="container" style="max-width: 720px;">
     <!-- Header -->
-    <div class="mb-12">
-      <a href="/" class="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-white transition-colors mb-6">
-        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Marketplace
-      </a>
-      <h1 class="text-4xl font-bold tracking-tight mb-3">Upload Dataset</h1>
-      <p class="text-slate-500 text-lg">
-        Store your AI training data on Walrus and list it for sale on Sui.
-      </p>
-    </div>
+    <a href="/" class="back-link">
+      <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+      Back to Marketplace
+    </a>
+
+    <h1 style="font-family: var(--sans); font-weight: 600; font-size: var(--text-3xl); letter-spacing: -0.032em; margin-bottom: 8px;">
+      Upload Dataset
+    </h1>
+    <p style="font-family: var(--mono); font-size: 15px; color: var(--dim); margin-bottom: var(--sp-7);">
+      Store your AI training data on Walrus and list it for sale on Sui.
+    </p>
 
     {#if success}
       <!-- Success State -->
-      <div class="glass rounded-2xl p-12 text-center">
-        <div class="w-20 h-20 rounded-full bg-walrus-500/10 flex items-center justify-center mx-auto mb-6">
-          <svg class="w-10 h-10 text-walrus-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div class="detail-card" style="text-align: center; padding: var(--sp-8);">
+        <div style="color: var(--accent); margin-bottom: var(--sp-4);">
+          <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto;">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
         </div>
-        <h2 class="text-2xl font-bold mb-3">Upload Successful!</h2>
-        <p class="text-slate-400 mb-8 max-w-md mx-auto">
+        <h2 style="font-family: var(--sans); font-weight: 600; font-size: var(--text-2xl); margin-bottom: var(--sp-3);">
+          Upload Successful!
+        </h2>
+        <p style="font-family: var(--mono); font-size: 14px; color: var(--dim); margin-bottom: var(--sp-6); max-width: 400px; margin-left: auto; margin-right: auto;">
           Your dataset has been uploaded to Walrus. Connect your wallet to list it on the marketplace.
         </p>
-        <div class="flex justify-center gap-4">
+        <div style="display: flex; justify-content: center; gap: var(--sp-4);">
           <button
+            class="btn btn--ghost"
             onclick={() => { success = false; file = null; name = ''; description = ''; }}
-            class="btn-secondary text-sm"
           >
             Upload Another
           </button>
-          <a href="/" class="btn-primary text-sm">
-            View Marketplace
-          </a>
+          <a href="/" class="btn btn--primary">View Marketplace</a>
         </div>
       </div>
 
     {:else}
       <!-- Upload Form -->
-      <form onsubmit={e => { e.preventDefault(); handleSubmit(); }} class="space-y-8">
-        <!-- File Upload -->
-        <div>
-          <label for="file-input" class="block text-sm font-medium text-slate-300 mb-3">Dataset File</label>
-          <div
-            role="button"
-            tabindex="0"
-            ondrop={handleDrop}
-            ondragover={handleDragOver}
-            onclick={() => document.getElementById('file-input')?.click()}
-            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') document.getElementById('file-input')?.click(); }}
-            class="glass rounded-2xl p-12 text-center cursor-pointer hover:border-nexus-500/30 transition-colors duration-200"
-          >
-            {#if file}
-              <div class="flex flex-col items-center">
-                <div class="w-14 h-14 rounded-xl bg-nexus-500/10 flex items-center justify-center mb-4">
-                  <svg class="w-7 h-7 text-nexus-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <form onsubmit={(e) => { e.preventDefault(); handleSubmit(); }}>
+        <div class="upload-form">
+          <!-- File Upload -->
+          <div class="form-group">
+            <label class="form-label">Dataset File</label>
+            <div
+              role="button"
+              tabindex="0"
+              ondrop={handleDrop}
+              ondragover={handleDragOver}
+              onclick={() => document.getElementById('file-input')?.click()}
+              onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') document.getElementById('file-input')?.click(); }}
+              class="drop-zone"
+            >
+              {#if file}
+                <div style="color: var(--accent);">
+                  <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto var(--sp-3);">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
-                <p class="text-white font-medium mb-1">{file.name}</p>
-                <p class="text-slate-500 text-sm">{formatFileSize(file.size)}</p>
-              </div>
-            {:else}
-              <div class="flex flex-col items-center">
-                <div class="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center mb-4">
-                  <svg class="w-7 h-7 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <p class="drop-zone__text" style="color: var(--fg); font-weight: 500;">{file.name}</p>
+                <p class="drop-zone__hint">{formatFileSize(file.size)}</p>
+              {:else}
+                <div class="drop-zone__icon">
+                  <svg width="32" height="32" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="margin: 0 auto var(--sp-3);">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                   </svg>
                 </div>
-                <p class="text-slate-400 mb-1">Drag and drop your file here</p>
-                <p class="text-slate-600 text-sm">or click to browse</p>
-              </div>
+                <p class="drop-zone__text">Drag and drop your file here</p>
+                <p class="drop-zone__hint">or click to browse</p>
+              {/if}
+            </div>
+            <input id="file-input" type="file" onchange={handleFileSelect} style="display: none;" />
+          </div>
+
+          <!-- Name & Category -->
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-5);">
+            <div class="form-group">
+              <label for="name" class="form-label">Name</label>
+              <input id="name" type="text" bind:value={name} placeholder="GPT-2 Embedding Vectors" class="form-input" />
+            </div>
+            <div class="form-group">
+              <label for="category" class="form-label">Category</label>
+              <select id="category" bind:value={category} class="form-input">
+                {#each categories as cat}
+                  <option value={cat.value}>{cat.label}</option>
+                {/each}
+              </select>
+            </div>
+          </div>
+
+          <!-- Description -->
+          <div class="form-group">
+            <label for="description" class="form-label">Description</label>
+            <textarea id="description" bind:value={description} rows="4" placeholder="Describe your dataset, its format, and potential use cases..." class="form-input"></textarea>
+          </div>
+
+          <!-- Price -->
+          <div class="form-group">
+            <label for="price" class="form-label">
+              Price (SUI) <span style="color: var(--faint); font-size: 11px;">2% platform fee</span>
+            </label>
+            <input id="price" type="number" bind:value={priceSui} min="0.01" step="0.01" class="form-input" />
+            {#if file}
+              <p style="font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-top: 6px;">
+                Estimated storage cost: {formatCost(estimatedCost)}
+              </p>
             {/if}
           </div>
-          <input
-            id="file-input"
-            type="file"
-            onchange={handleFileSelect}
-            class="hidden"
-          />
-        </div>
 
-        <!-- Dataset Details -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-          <div>
-            <label for="name" class="block text-sm font-medium text-slate-300 mb-3">Name</label>
-            <input
-              id="name"
-              type="text"
-              bind:value={name}
-              placeholder="GPT-2 Embedding Vectors"
-              class="input-field"
-            />
-          </div>
-
-          <div>
-            <label for="category" class="block text-sm font-medium text-slate-300 mb-3">Category</label>
-            <select id="category" bind:value={category} class="input-field">
-              {#each categories as cat}
-                <option value={cat.value}>{cat.label}</option>
-              {/each}
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label for="description" class="block text-sm font-medium text-slate-300 mb-3">Description</label>
-          <textarea
-            id="description"
-            bind:value={description}
-            rows="4"
-            placeholder="Describe your dataset, its format, and potential use cases..."
-            class="input-field resize-none"
-          ></textarea>
-        </div>
-
-        <div>
-          <label for="price" class="block text-sm font-medium text-slate-300 mb-3">
-            Price (SUI)
-            <span class="text-slate-600 font-normal ml-2">2% platform fee</span>
-          </label>
-          <input
-            id="price"
-            type="number"
-            bind:value={priceSui}
-            min="0.01"
-            step="0.01"
-            class="input-field"
-          />
-          {#if file}
-            <p class="text-slate-600 text-xs mt-2 font-mono">
-              Estimated storage cost: {formatCost(estimatedCost)}
-            </p>
+          <!-- Error -->
+          {#if error}
+            <div class="alert alert--error" style="margin-bottom: var(--sp-5);">
+              {error}
+            </div>
           {/if}
-        </div>
 
-        <!-- Error Message -->
-        {#if error}
-          <div class="glass rounded-xl p-4 border-red-500/20">
-            <p class="text-red-400 text-sm">{error}</p>
-          </div>
-        {/if}
-
-        <!-- Progress Bar -->
-        {#if uploading}
-          <div>
-            <div class="flex justify-between text-sm text-slate-500 mb-2">
-              <span>Uploading to Walrus...</span>
-              <span>{Math.round(progress)}%</span>
-            </div>
-            <div class="w-full bg-white/5 rounded-full h-2 overflow-hidden">
-              <div
-                class="h-full bg-gradient-to-r from-nexus-500 to-tatum-500 rounded-full transition-all duration-300"
-                style="width: {progress}%"
-              ></div>
-            </div>
-          </div>
-        {/if}
-
-        <!-- Submit Button -->
-        <button
-          type="submit"
-          disabled={uploading || !file || !name || !description || priceSui <= 0}
-          class="w-full btn-primary !py-4 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-        >
+          <!-- Progress -->
           {#if uploading}
-            <span class="flex items-center justify-center gap-2">
-              <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-              Uploading...
-            </span>
-          {:else}
-            Upload and List Dataset
+            <div class="form-group">
+              <div style="display: flex; justify-content: space-between; font-family: var(--mono); font-size: 12.5px; color: var(--dim); margin-bottom: 8px;">
+                <span>Uploading to Walrus...</span>
+                <span>{Math.round(progress)}%</span>
+              </div>
+              <div class="progress">
+                <div class="progress__bar" style="width: {progress}%"></div>
+              </div>
+            </div>
           {/if}
-        </button>
 
-        <!-- Wallet Note -->
-        <div class="glass rounded-xl p-4">
-          <p class="text-slate-500 text-sm">
-            <strong class="text-slate-400">Note:</strong> To complete the listing, you will need to connect your Sui wallet and sign the transaction. Wallet integration will be enabled after deployment.
-          </p>
+          <!-- Submit -->
+          <button
+            type="submit"
+            disabled={uploading || !file || !name || !description || priceSui <= 0}
+            class="btn btn--primary"
+            style="width: 100%; justify-content: center; padding: 16px 24px;"
+          >
+            {#if uploading}
+              Uploading...
+            {:else}
+              Upload and List Dataset
+            {/if}
+          </button>
+
+          <!-- Note -->
+          <div style="margin-top: var(--sp-5); padding: var(--sp-4); background: var(--bone-alt); border-radius: var(--r-md); border: 1px solid var(--line-soft);">
+            <p style="font-family: var(--mono); font-size: 12.5px; color: var(--dim);">
+              <strong style="color: var(--fg);">Note:</strong> To complete the listing, you will need to connect your Sui wallet and sign the transaction.
+            </p>
+          </div>
         </div>
       </form>
     {/if}
