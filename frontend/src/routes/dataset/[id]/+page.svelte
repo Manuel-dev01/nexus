@@ -80,20 +80,9 @@
 
   async function handlePurchase() {
     if (!dataset) return;
-
     purchasing = true;
     error = null;
-
     try {
-      // In production, this would use dapp-kit to sign the transaction
-      // const tx = buildBuyDatasetTransaction({
-      //   marketplaceId: MARKETPLACE_ID,
-      //   listingId: dataset.id,
-      //   paymentCoinId: selectedCoinId,
-      //   paymentAmount: dataset.price,
-      //   clockId: '0x6',
-      // });
-
       alert('Purchase functionality requires wallet connection. Will be enabled after deployment.');
     } catch (err) {
       error = err instanceof Error ? err.message : 'Purchase failed';
@@ -104,14 +93,10 @@
 
   async function handleDownload() {
     if (!dataset) return;
-
     downloading = true;
     error = null;
-
     try {
       const result = await downloadFromWalrus(dataset.walrusBlobId, dataset.contentHash || undefined);
-
-      // Create download link
       const blob = new Blob([result.data]);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -121,11 +106,7 @@
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-
-      verificationResult = {
-        verified: result.verified,
-        sha256: result.sha256,
-      };
+      verificationResult = { verified: result.verified, sha256: result.sha256 };
     } catch (err) {
       error = err instanceof Error ? err.message : 'Download failed';
     } finally {
@@ -135,16 +116,11 @@
 
   async function handleVerify() {
     if (!dataset?.contentHash) return;
-
     verifying = true;
     verificationResult = null;
-
     try {
       const verified = await verifyBlob(dataset.walrusBlobId, dataset.contentHash);
-      verificationResult = {
-        verified,
-        sha256: dataset.contentHash,
-      };
+      verificationResult = { verified, sha256: dataset.contentHash };
     } catch (err) {
       error = err instanceof Error ? err.message : 'Verification failed';
     } finally {
@@ -158,20 +134,17 @@
 
   function formatDate(timestamp: number): string {
     return new Date(timestamp).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
+      year: 'numeric', month: 'long', day: 'numeric',
+      hour: '2-digit', minute: '2-digit',
     });
   }
 
-  function getCategoryColor(category: string): string {
+  function getCategoryBadge(category: string): string {
     switch (category) {
-      case 'embeddings': return 'bg-blue-100 text-blue-800';
-      case 'fine-tuning': return 'bg-green-100 text-green-800';
-      case 'model-weights': return 'bg-purple-100 text-purple-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'embeddings': return 'badge-embeddings';
+      case 'fine-tuning': return 'badge-fine-tuning';
+      case 'model-weights': return 'badge-model-weights';
+      default: return 'badge-embeddings';
     }
   }
 </script>
@@ -180,87 +153,77 @@
   <title>{dataset?.name || 'Dataset'} — Nexus</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
-  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+<div class="gradient-bg min-h-screen">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
     <!-- Back Link -->
-    <a href="/" class="text-blue-400 hover:text-blue-300 mb-8 inline-block">
-      ← Back to Marketplace
+    <a href="/" class="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-white transition-colors mb-8">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+      </svg>
+      Back to Marketplace
     </a>
 
     {#if loading}
-      <!-- Loading State -->
-      <div class="text-center py-20">
-        <div class="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-        <p class="text-gray-400">Loading dataset details...</p>
+      <div class="text-center py-32">
+        <div class="inline-block w-12 h-12 border-2 border-nexus-500/30 border-t-nexus-500 rounded-full animate-spin mb-4"></div>
+        <p class="text-slate-500">Loading dataset details...</p>
       </div>
 
     {:else if error && !dataset}
-      <!-- Error State -->
-      <div class="text-center py-20">
-        <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-6 max-w-md mx-auto">
-          <p class="text-red-400 mb-4">{error}</p>
-          <a href="/" class="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors">
-            Back to Marketplace
-          </a>
+      <div class="text-center py-32">
+        <div class="glass rounded-2xl p-8 max-w-md mx-auto">
+          <p class="text-red-400 mb-6">{error}</p>
+          <a href="/" class="btn-primary text-sm">Back to Marketplace</a>
         </div>
       </div>
 
     {:else if dataset}
-      <!-- Dataset Details -->
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <!-- Main Content -->
         <div class="lg:col-span-2 space-y-6">
-          <!-- Header -->
-          <div class="bg-white/5 border border-white/10 rounded-xl p-8">
-            <div class="flex items-start justify-between mb-4">
-              <span class="px-3 py-1 text-sm font-medium rounded-full {getCategoryColor(dataset.category)}">
-                {dataset.category}
-              </span>
-              <span class="text-gray-500 text-sm">
+          <!-- Header Card -->
+          <div class="glass rounded-2xl p-8">
+            <div class="flex items-start justify-between mb-6">
+              <span class="{getCategoryBadge(dataset.category)}">{dataset.category}</span>
+              <span class="text-xs text-slate-600">
                 {dataset.purchaseCount} {dataset.purchaseCount === 1 ? 'purchase' : 'purchases'}
               </span>
             </div>
 
-            <h1 class="text-3xl font-bold text-white mb-4">{dataset.name}</h1>
-            <p class="text-gray-300 leading-relaxed">{dataset.description}</p>
+            <h1 class="text-3xl font-bold tracking-tight mb-4">{dataset.name}</h1>
+            <p class="text-slate-400 leading-relaxed">{dataset.description}</p>
           </div>
 
           <!-- Technical Details -->
-          <div class="bg-white/5 border border-white/10 rounded-xl p-8">
-            <h2 class="text-xl font-semibold text-white mb-6">Technical Details</h2>
-
+          <div class="glass rounded-2xl p-8">
+            <h2 class="text-xl font-semibold mb-6">Technical Details</h2>
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div>
-                <div class="text-gray-500 text-sm mb-1">Size</div>
-                <div class="text-white font-medium">{formatFileSize(dataset.sizeBytes)}</div>
+                <div class="text-xs text-slate-600 uppercase tracking-wider mb-1">Size</div>
+                <div class="text-white font-mono">{formatFileSize(dataset.sizeBytes)}</div>
               </div>
-
               <div>
-                <div class="text-gray-500 text-sm mb-1">Listed</div>
-                <div class="text-white font-medium">{formatDate(dataset.listedAt)}</div>
+                <div class="text-xs text-slate-600 uppercase tracking-wider mb-1">Listed</div>
+                <div class="text-white">{formatDate(dataset.listedAt)}</div>
               </div>
-
               <div>
-                <div class="text-gray-500 text-sm mb-1">Provider</div>
-                <div class="text-white font-medium font-mono">{truncateAddress(dataset.provider)}</div>
+                <div class="text-xs text-slate-600 uppercase tracking-wider mb-1">Provider</div>
+                <div class="text-white font-mono text-sm">{truncateAddress(dataset.provider)}</div>
               </div>
-
               <div>
-                <div class="text-gray-500 text-sm mb-1">Storage Epochs</div>
-                <div class="text-white font-medium">{dataset.storageEpochs || 'N/A'}</div>
+                <div class="text-xs text-slate-600 uppercase tracking-wider mb-1">Storage Epochs</div>
+                <div class="text-white">{dataset.storageEpochs || 'N/A'}</div>
               </div>
-
               <div class="sm:col-span-2">
-                <div class="text-gray-500 text-sm mb-1">Walrus Blob ID</div>
-                <div class="text-white font-mono text-sm break-all bg-white/5 rounded-lg p-3">
+                <div class="text-xs text-slate-600 uppercase tracking-wider mb-1">Walrus Blob ID</div>
+                <div class="text-white font-mono text-xs break-all bg-white/5 rounded-lg p-3 mt-1">
                   {dataset.walrusBlobId}
                 </div>
               </div>
-
               {#if dataset.contentHash}
                 <div class="sm:col-span-2">
-                  <div class="text-gray-500 text-sm mb-1">Content Hash (SHA256)</div>
-                  <div class="text-white font-mono text-sm break-all bg-white/5 rounded-lg p-3">
+                  <div class="text-xs text-slate-600 uppercase tracking-wider mb-1">Content Hash (SHA256)</div>
+                  <div class="text-white font-mono text-xs break-all bg-white/5 rounded-lg p-3 mt-1">
                     {dataset.contentHash}
                   </div>
                 </div>
@@ -268,40 +231,32 @@
             </div>
           </div>
 
-          <!-- Verification Section -->
+          <!-- Verification -->
           {#if dataset.contentHash}
-            <div class="bg-white/5 border border-white/10 rounded-xl p-8">
-              <h2 class="text-xl font-semibold text-white mb-4">Integrity Verification</h2>
-              <p class="text-gray-400 mb-4">
-                Verify that the downloaded content matches the original hash.
-              </p>
+            <div class="glass rounded-2xl p-8">
+              <h2 class="text-xl font-semibold mb-3">Integrity Verification</h2>
+              <p class="text-slate-500 text-sm mb-6">Verify that the downloaded content matches the original hash.</p>
 
-              <button
-                onclick={handleVerify}
-                disabled={verifying}
-                class="px-6 py-2 bg-white/10 hover:bg-white/20 disabled:bg-gray-600 text-white rounded-lg transition-colors"
-              >
+              <button onclick={handleVerify} disabled={verifying} class="btn-secondary text-sm">
                 {verifying ? 'Verifying...' : 'Verify Integrity'}
               </button>
 
               {#if verificationResult}
-                <div class="mt-4 p-4 rounded-lg {verificationResult.verified ? 'bg-green-500/10 border border-green-500/20' : 'bg-red-500/10 border border-red-500/20'}">
-                  <div class="flex items-center gap-2">
+                <div class="mt-6 p-4 rounded-xl {verificationResult.verified ? 'bg-walrus-500/10 border border-walrus-500/20' : 'bg-red-500/10 border border-red-500/20'}">
+                  <div class="flex items-center gap-2 mb-2">
                     {#if verificationResult.verified}
-                      <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-5 h-5 text-walrus-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
-                      <span class="text-green-400 font-medium">Verified</span>
+                      <span class="text-walrus-400 font-medium">Verified</span>
                     {:else}
-                      <svg class="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <svg class="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
                       </svg>
                       <span class="text-red-400 font-medium">Mismatch</span>
                     {/if}
                   </div>
-                  <p class="text-gray-400 text-sm mt-2 font-mono">
-                    SHA256: {verificationResult.sha256}
-                  </p>
+                  <p class="text-slate-500 text-xs font-mono break-all">{verificationResult.sha256}</p>
                 </div>
               {/if}
             </div>
@@ -311,85 +266,72 @@
         <!-- Sidebar -->
         <div class="space-y-6">
           <!-- Purchase Card -->
-          <div class="bg-white/5 border border-white/10 rounded-xl p-6 sticky top-6">
-            <div class="text-center mb-6">
-              <div class="text-4xl font-bold text-white mb-2">
-                {formatSui(dataset.price)}
-              </div>
-              <div class="text-gray-500">
-                {dataset.active ? 'Available' : 'Sold'}
-              </div>
+          <div class="glass rounded-2xl p-6 sticky top-24">
+            <div class="text-center mb-8">
+              <div class="text-4xl font-bold gradient-text mb-2">{formatSui(dataset.price)}</div>
+              <div class="text-slate-500 text-sm">{dataset.active ? 'Available' : 'Sold'}</div>
             </div>
 
             {#if dataset.active}
-              <button
-                onclick={handlePurchase}
-                disabled={purchasing}
-                class="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors mb-4"
-              >
+              <button onclick={handlePurchase} disabled={purchasing} class="w-full btn-primary !py-4 mb-3 disabled:opacity-50 disabled:cursor-not-allowed">
                 {purchasing ? 'Processing...' : 'Purchase Dataset'}
               </button>
-
-              <button
-                onclick={handleDownload}
-                disabled={downloading}
-                class="w-full py-4 bg-white/10 hover:bg-white/20 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
-              >
+              <button onclick={handleDownload} disabled={downloading} class="w-full btn-secondary !py-4 disabled:opacity-50 disabled:cursor-not-allowed">
                 {downloading ? 'Downloading...' : 'Download from Walrus'}
               </button>
             {:else}
-              <button
-                onclick={handleDownload}
-                disabled={downloading}
-                class="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
-              >
+              <button onclick={handleDownload} disabled={downloading} class="w-full btn-primary !py-4 !bg-walrus-600 hover:!bg-walrus-700 disabled:opacity-50 disabled:cursor-not-allowed">
                 {downloading ? 'Downloading...' : 'Download Dataset'}
               </button>
             {/if}
 
-            <!-- Error Message -->
             {#if error}
-              <div class="mt-4 bg-red-500/10 border border-red-500/20 rounded-lg p-3">
+              <div class="mt-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
                 <p class="text-red-400 text-sm">{error}</p>
               </div>
             {/if}
 
-            <!-- Info -->
-            <div class="mt-6 space-y-3 text-sm">
-              <div class="flex justify-between text-gray-500">
+            <div class="mt-8 pt-6 border-t border-white/5 space-y-3 text-sm">
+              <div class="flex justify-between text-slate-500">
                 <span>Platform Fee</span>
                 <span>2%</span>
               </div>
-              <div class="flex justify-between text-gray-500">
+              <div class="flex justify-between text-slate-500">
                 <span>Provider Receives</span>
                 <span>{formatSui(Math.floor(dataset.price * 0.98))}</span>
               </div>
-              <div class="flex justify-between text-gray-500">
+              <div class="flex justify-between text-slate-500">
                 <span>Storage</span>
                 <span>Walrus Testnet</span>
               </div>
             </div>
           </div>
 
-          <!-- Actions Card -->
-          <div class="bg-white/5 border border-white/10 rounded-xl p-6">
-            <h3 class="text-white font-medium mb-4">Actions</h3>
+          <!-- Links Card -->
+          <div class="glass rounded-2xl p-6">
+            <h3 class="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">External Links</h3>
             <div class="space-y-3">
               <a
                 href="https://aggregator.walrus-testnet.walrus.space/v1/blobs/{dataset.walrusBlobId}"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="block text-blue-400 hover:text-blue-300 text-sm"
+                class="flex items-center gap-2 text-sm text-nexus-400 hover:text-nexus-300 transition-colors"
               >
-                View on Walrus Aggregator →
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                View on Walrus Aggregator
               </a>
               <a
                 href="https://suiexplorer.com/object/{dataset.id}?network=testnet"
                 target="_blank"
                 rel="noopener noreferrer"
-                class="block text-blue-400 hover:text-blue-300 text-sm"
+                class="flex items-center gap-2 text-sm text-nexus-400 hover:text-nexus-300 transition-colors"
               >
-                View on Sui Explorer →
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+                View on Sui Explorer
               </a>
             </div>
           </div>

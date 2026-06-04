@@ -48,36 +48,17 @@
     progress = 0;
 
     try {
-      // Step 1: Upload to Walrus
       const walrusResult = await uploadToWalrus(file, 5, (p) => {
-        progress = p.percentage * 0.5; // First 50% is Walrus upload
+        progress = p.percentage * 0.5;
       });
 
       progress = 50;
 
-      // Step 2: List on Sui
-      // Note: This requires wallet connection (dapp-kit)
-      // For now, we'll show the transaction details
       const priceMist = Math.floor(priceSui * 1_000_000_000);
-
-      // In production, this would use dapp-kit to sign the transaction
-      // const tx = buildListDatasetTransaction({
-      //   marketplaceId: MARKETPLACE_ID,
-      //   name,
-      //   description,
-      //   category,
-      //   walrusBlobId: walrusResult.blobId,
-      //   sizeBytes: file.size,
-      //   price: priceMist,
-      //   contentHash: walrusResult.sha256,
-      //   storageEpochs: 5,
-      //   clockId: '0x6',
-      // });
 
       progress = 100;
       success = true;
 
-      // Show success with blob ID
       console.log('Upload successful!', {
         blobId: walrusResult.blobId,
         cost: walrusResult.cost,
@@ -99,40 +80,42 @@
   <title>Upload Dataset — Nexus</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
-  <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+<div class="gradient-bg min-h-screen">
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-24">
     <!-- Header -->
-    <div class="mb-8">
-      <a href="/" class="text-blue-400 hover:text-blue-300 mb-4 inline-block">
-        ← Back to Marketplace
+    <div class="mb-12">
+      <a href="/" class="inline-flex items-center gap-2 text-sm text-slate-500 hover:text-white transition-colors mb-6">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
+        </svg>
+        Back to Marketplace
       </a>
-      <h1 class="text-4xl font-bold text-white">Upload Dataset</h1>
-      <p class="text-gray-400 mt-2">
-        Upload your AI training data to Walrus decentralized storage and list it for sale.
+      <h1 class="text-4xl font-bold tracking-tight mb-3">Upload Dataset</h1>
+      <p class="text-slate-500 text-lg">
+        Store your AI training data on Walrus and list it for sale on Sui.
       </p>
     </div>
 
     {#if success}
       <!-- Success State -->
-      <div class="bg-green-500/10 border border-green-500/20 rounded-xl p-8 text-center">
-        <svg class="w-16 h-16 text-green-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <h2 class="text-2xl font-bold text-white mb-2">Upload Successful!</h2>
-        <p class="text-gray-400 mb-6">
+      <div class="glass rounded-2xl p-12 text-center">
+        <div class="w-20 h-20 rounded-full bg-walrus-500/10 flex items-center justify-center mx-auto mb-6">
+          <svg class="w-10 h-10 text-walrus-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </div>
+        <h2 class="text-2xl font-bold mb-3">Upload Successful!</h2>
+        <p class="text-slate-400 mb-8 max-w-md mx-auto">
           Your dataset has been uploaded to Walrus. Connect your wallet to list it on the marketplace.
         </p>
         <div class="flex justify-center gap-4">
           <button
             onclick={() => { success = false; file = null; name = ''; description = ''; }}
-            class="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+            class="btn-secondary text-sm"
           >
             Upload Another
           </button>
-          <a
-            href="/"
-            class="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
-          >
+          <a href="/" class="btn-primary text-sm">
             View Marketplace
           </a>
         </div>
@@ -143,31 +126,33 @@
       <form onsubmit={e => { e.preventDefault(); handleSubmit(); }} class="space-y-8">
         <!-- File Upload -->
         <div>
-          <label class="block text-white font-medium mb-4">Dataset File</label>
+          <label class="block text-sm font-medium text-slate-300 mb-3">Dataset File</label>
           <div
             ondrop={handleDrop}
             ondragover={handleDragOver}
-            class="border-2 border-dashed border-white/20 hover:border-blue-500 rounded-xl p-12 text-center cursor-pointer transition-colors"
             onclick={() => document.getElementById('file-input')?.click()}
+            class="glass rounded-2xl p-12 text-center cursor-pointer hover:border-nexus-500/30 transition-colors duration-200"
           >
             {#if file}
-              <div class="text-white">
-                <svg class="w-12 h-12 text-blue-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                <p class="text-lg font-medium">{file.name}</p>
-                <p class="text-gray-400 mt-1">{formatFileSize(file.size)}</p>
+              <div class="flex flex-col items-center">
+                <div class="w-14 h-14 rounded-xl bg-nexus-500/10 flex items-center justify-center mb-4">
+                  <svg class="w-7 h-7 text-nexus-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </div>
+                <p class="text-white font-medium mb-1">{file.name}</p>
+                <p class="text-slate-500 text-sm">{formatFileSize(file.size)}</p>
               </div>
             {:else}
-              <svg class="w-12 h-12 text-gray-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-              </svg>
-              <p class="text-gray-400">
-                Drag and drop your file here, or click to browse
-              </p>
-              <p class="text-gray-500 text-sm mt-2">
-                Supports any file format (CSV, JSONL, Parquet, SafeTensors, etc.)
-              </p>
+              <div class="flex flex-col items-center">
+                <div class="w-14 h-14 rounded-xl bg-white/5 flex items-center justify-center mb-4">
+                  <svg class="w-7 h-7 text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                </div>
+                <p class="text-slate-400 mb-1">Drag and drop your file here</p>
+                <p class="text-slate-600 text-sm">or click to browse</p>
+              </div>
             {/if}
           </div>
           <input
@@ -179,25 +164,21 @@
         </div>
 
         <!-- Dataset Details -->
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div>
-            <label for="name" class="block text-white font-medium mb-2">Name</label>
+            <label for="name" class="block text-sm font-medium text-slate-300 mb-3">Name</label>
             <input
               id="name"
               type="text"
               bind:value={name}
-              placeholder="e.g., GPT-2 Embedding Vectors"
-              class="w-full bg-white/10 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-500"
+              placeholder="GPT-2 Embedding Vectors"
+              class="input-field"
             />
           </div>
 
           <div>
-            <label for="category" class="block text-white font-medium mb-2">Category</label>
-            <select
-              id="category"
-              bind:value={category}
-              class="w-full bg-white/10 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
+            <label for="category" class="block text-sm font-medium text-slate-300 mb-3">Category</label>
+            <select id="category" bind:value={category} class="input-field">
               {#each categories as cat}
                 <option value={cat.value}>{cat.label}</option>
               {/each}
@@ -206,20 +187,20 @@
         </div>
 
         <div>
-          <label for="description" class="block text-white font-medium mb-2">Description</label>
+          <label for="description" class="block text-sm font-medium text-slate-300 mb-3">Description</label>
           <textarea
             id="description"
             bind:value={description}
             rows="4"
             placeholder="Describe your dataset, its format, and potential use cases..."
-            class="w-full bg-white/10 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500 placeholder-gray-500"
+            class="input-field resize-none"
           ></textarea>
         </div>
 
         <div>
-          <label for="price" class="block text-white font-medium mb-2">
+          <label for="price" class="block text-sm font-medium text-slate-300 mb-3">
             Price (SUI)
-            <span class="text-gray-400 font-normal">— 2% platform fee</span>
+            <span class="text-slate-600 font-normal ml-2">2% platform fee</span>
           </label>
           <input
             id="price"
@@ -227,10 +208,10 @@
             bind:value={priceSui}
             min="0.01"
             step="0.01"
-            class="w-full bg-white/10 border border-white/20 text-white rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            class="input-field"
           />
           {#if file}
-            <p class="text-gray-500 text-sm mt-2">
+            <p class="text-slate-600 text-xs mt-2 font-mono">
               Estimated storage cost: {formatCost(estimatedCost)}
             </p>
           {/if}
@@ -238,21 +219,21 @@
 
         <!-- Error Message -->
         {#if error}
-          <div class="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-            <p class="text-red-400">{error}</p>
+          <div class="glass rounded-xl p-4 border-red-500/20">
+            <p class="text-red-400 text-sm">{error}</p>
           </div>
         {/if}
 
         <!-- Progress Bar -->
         {#if uploading}
           <div>
-            <div class="flex justify-between text-sm text-gray-400 mb-2">
+            <div class="flex justify-between text-sm text-slate-500 mb-2">
               <span>Uploading to Walrus...</span>
               <span>{Math.round(progress)}%</span>
             </div>
-            <div class="w-full bg-white/10 rounded-full h-2">
+            <div class="w-full bg-white/5 rounded-full h-2 overflow-hidden">
               <div
-                class="bg-blue-600 h-2 rounded-full transition-all duration-300"
+                class="h-full bg-gradient-to-r from-nexus-500 to-tatum-500 rounded-full transition-all duration-300"
                 style="width: {progress}%"
               ></div>
             </div>
@@ -263,20 +244,24 @@
         <button
           type="submit"
           disabled={uploading || !file || !name || !description || priceSui <= 0}
-          class="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-semibold rounded-lg transition-colors"
+          class="w-full btn-primary !py-4 text-base disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
         >
           {#if uploading}
-            Uploading...
+            <span class="flex items-center justify-center gap-2">
+              <svg class="w-5 h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+              Uploading...
+            </span>
           {:else}
-            Upload & List Dataset
+            Upload and List Dataset
           {/if}
         </button>
 
-        <!-- Wallet Connection Note -->
-        <div class="bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-4">
-          <p class="text-yellow-400 text-sm">
-            <strong>Note:</strong> To complete the listing, you'll need to connect your Sui wallet
-            and sign the transaction. Wallet integration will be enabled after deployment.
+        <!-- Wallet Note -->
+        <div class="glass rounded-xl p-4">
+          <p class="text-slate-500 text-sm">
+            <strong class="text-slate-400">Note:</strong> To complete the listing, you will need to connect your Sui wallet and sign the transaction. Wallet integration will be enabled after deployment.
           </p>
         </div>
       </form>

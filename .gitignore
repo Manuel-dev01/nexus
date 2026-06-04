@@ -10,6 +10,9 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 
+# Lock files (keep only one)
+frontend/package-lock.json
+
 # SvelteKit
 frontend/.svelte-kit/
 frontend/build/
@@ -25,6 +28,9 @@ mcp-server/node_modules/
 
 # Scripts
 scripts/node_modules/
+
+# Generated files
+spike-report.json
 
 # OS files
 .DS_Store

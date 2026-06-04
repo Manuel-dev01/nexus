@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/Protocol-MCP-FF6B6B?style=for-the-badge" alt="MCP" />
 </p>
 
-<h1 align="center">🔮 Nexus</h1>
+<h1 align="center">Nexus</h1>
 <h3 align="center">The First Decentralized Marketplace Where AI Agents<br/>Autonomously Purchase and Ingest Their Own Memory</h3>
 
 <p align="center">
@@ -14,133 +14,67 @@
 
 ---
 
-## 🎯 What is Nexus?
+## What is Nexus?
 
-**Nexus** is a decentralized AI model & memory marketplace built natively on the Sui blockchain. It solves a critical problem: **AI systems need access to massive, high-quality training datasets, but current data marketplaces are centralized, opaque, and inaccessible to autonomous agents.**
+**Nexus** is a decentralized AI model and memory marketplace built natively on the Sui blockchain. It solves a critical problem: AI systems need access to massive, high-quality training datasets, but current data marketplaces are centralized, opaque, and inaccessible to autonomous agents.
 
 Nexus flips this model:
 
 1. **Data Providers** upload massive AI datasets to [Walrus](https://wal.app) decentralized storage and list them on-chain with a SUI price.
-2. **Data Consumers** browse, pay, and receive token-gated download access — all on-chain.
-3. **AI Agents** (the differentiator) autonomously discover, evaluate, and purchase datasets through a [Tatum](https://tatum.io) MCP Server — no human clicks required.
+2. **Data Consumers** browse, pay, and receive token-gated download access, all on-chain.
+3. **AI Agents** (the differentiator) autonomously discover, evaluate, and purchase datasets through a [Tatum](https://tatum.io) MCP Server, with no human clicks required.
 
-> *"What if your AI could buy its own training data?"* — That's Nexus.
-
----
-
-## 🏗️ Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     NEXUS ECOSYSTEM                         │
-├─────────────────────────────────────────────────────────────┤
-│                                                             │
-│  ┌──────────┐    ┌─────────────┐    ┌────────────────────┐ │
-│  │ SvelteKit│───▶│ Tatum Sui   │───▶│   Sui Blockchain   │ │
-│  │ Frontend │    │ RPC Gateway │    │ (Move Contracts)   │ │
-│  └────┬─────┘    └─────────────┘    │                    │ │
-│       │                             │ • Marketplace      │ │
-│       │ Upload/                     │ • DatasetListing   │ │
-│       │ Download                    │ • DatasetAccess    │ │
-│       ▼                             │ • NexusTreasury    │ │
-│  ┌──────────┐                       └────────────────────┘ │
-│  │  Walrus  │    RedStuff Erasure Coding                   │
-│  │ Storage  │    Across Decentralized Nodes                │
-│  └──────────┘                                              │
-│                                                             │
-│  ┌──────────┐    ┌─────────────┐    ┌────────────────────┐ │
-│  │ AI Agent │───▶│ Nexus MCP   │───▶│ Tatum RPC + Walrus │ │
-│  │ (LLM)   │    │ Server      │    │ Aggregator         │ │
-│  └──────────┘    └─────────────┘    └────────────────────┘ │
-│                                                             │
-└─────────────────────────────────────────────────────────────┘
-```
+> *What if your AI could buy its own training data?* That's Nexus.
 
 ---
 
-## 🐳 Walrus Integration (Decentralized Storage)
-
-Nexus uses **Walrus** as its backbone for storing massive AI datasets. Instead of trusting a centralized cloud provider, all data is:
-
-- **Erasure-coded** using RedStuff (RS2) across a decentralized network of storage nodes
-- **Content-addressed** via cryptographic Blob IDs
-- **Publicly retrievable** via the Walrus Aggregator — no authentication needed for reads
-
-| Operation | Endpoint | Method |
-|-----------|----------|--------|
-| Upload Dataset | `PUT publisher.walrus-testnet.walrus.space/v1/blobs` | HTTP PUT |
-| Download Dataset | `GET aggregator.walrus-testnet.walrus.space/v1/blobs/{blobId}` | HTTP GET |
-
-**Why Walrus?** Traditional IPFS pinning is unreliable. Centralized storage defeats decentralization. Walrus provides **guaranteed availability** through economic incentives and erasure coding — perfect for datasets that must be reliably available for AI agents purchasing access.
-
----
-
-## ⚡ Tatum Integration (RPC Gateway + MCP)
-
-Nexus uses **Tatum** at two critical layers:
-
-### 1. Sui RPC Gateway
-All blockchain interactions — from the frontend wallet to backend scripts — are routed through Tatum's managed Sui RPC gateway:
-```
-https://sui-testnet.gateway.tatum.io
-```
-This ensures reliable, low-latency access to the Sui network without running our own full node.
-
-### 2. Model Context Protocol (MCP) Server
-Nexus implements a **custom MCP server** that exposes domain-specific tools for AI agents, powered by Tatum's RPC infrastructure:
-
-| MCP Tool | Description | Backed By |
-|----------|-------------|-----------|
-| `search_nexus_datasets` | Find datasets by metadata, price range | Tatum `sui_queryEvents` |
-| `get_dataset_details` | Get full listing info including Blob ID | Tatum `sui_getObject` |
-| `get_walrus_blob` | Download raw dataset from Walrus | Walrus Aggregator |
-
-The Tatum `@tatumio/blockchain-mcp` server runs alongside for generic blockchain data (wallet balances, transaction history, etc.).
-
----
-
-## 🔄 The Autonomous Flow
+## Architecture
 
 ```
-Data Provider                    AI Agent                      Sui + Walrus
-     │                               │                              │
-     │  1. Upload dataset to Walrus  │                              │
-     │──────────────────────────────▶│         Walrus Publisher     │
-     │        ◀── Blob ID ──────────│                              │
-     │                               │                              │
-     │  2. List on Sui (PTB)         │                              │
-     │──────────────────────────────▶│      Tatum Sui Gateway      │
-     │     DatasetListing created    │                              │
-     │                               │                              │
-     │                               │  3. "Find me a dataset       │
-     │                               │      on stablecoin prices"   │
-     │                               │──────── Nexus MCP ─────────▶│
-     │                               │  ◀─── Listing found ───────│
-     │                               │                              │
-     │                               │  4. Purchase (sign PTB)      │
-     │                               │──────── Tatum RPC ─────────▶│
-     │    ◀── SUI payment ──────────│   DatasetAccess minted       │
-     │                               │                              │
-     │                               │  5. Download via Walrus      │
-     │                               │──────── Aggregator ────────▶│
-     │                               │  ◀─── Raw dataset ─────────│
-     │                               │                              │
-     │                               │  6. AI ingests new memory    │
++--------------------------------------------------------------+
+|                      NEXUS ECOSYSTEM                          |
++--------------------------------------------------------------+
+|                                                                |
+|  +----------+    +-------------+    +---------------------+   |
+|  | SvelteKit|--->| Tatum Sui   |--->|   Sui Blockchain    |   |
+|  | Frontend |    | RPC Gateway |    | (Move Contracts)    |   |
+|  |          |    +-------------+    |                     |   |
+|  | Upload/  |                       | - Marketplace       |   |
+|  | Download |                       | - DatasetListing    |   |
+|  |          |                       | - DatasetAccess     |   |
+|  +----+-----+                       | - NexusTreasury     |   |
+|       |                             +---------------------+   |
+|       v                                                        |
+|  +----------+    RedStuff Erasure Coding                      |
+|  |  Walrus  |    Across Decentralized Nodes                   |
+|  | Storage  |                                                  |
+|  +----------+                                                  |
+|                                                                |
+|  +----------+    +-------------+    +---------------------+   |
+|  | AI Agent |--->| Nexus MCP   |--->| Tatum RPC + Walrus  |   |
+|  | (LLM)   |    | Server      |    | Aggregator          |   |
+|  +----------+    +-------------+    +---------------------+   |
+|                                                                |
++--------------------------------------------------------------+
 ```
 
 ---
 
-## 🌐 Live Demo
+## Live Demo
 
 **Frontend:** https://nexus-l6qjs42ha-manuel-dev01s-projects.vercel.app
 
+**Landing Page:** See `nexus-landing/index.html` in the repository root.
+
 **Deployed Contracts (Sui Testnet):**
+
 | Contract | Object ID |
 |----------|-----------|
 | Package | `0xd4121a4525729f9319db53d66967f0669a5eff6603009d346befe9bac5b74816` |
 | Marketplace | `0x7718f693693cac1637a972ae9a6cf14fdacb0d275a8c8b1aef34eb4b4dae1bce` |
 
 **Seeded Datasets:**
+
 | Dataset | Category | Price | Walrus Blob ID |
 |---------|----------|-------|----------------|
 | GPT-2 Embedding Vectors | embeddings | 0.5 SUI | `CxrYYF3kB_Pv9na0JNXTbVohjkemkFI0wL4kqnCK9Ls` |
@@ -149,16 +83,96 @@ Data Provider                    AI Agent                      Sui + Walrus
 
 ---
 
-## 🚀 Quick Start
+## Walrus Integration (Decentralized Storage)
+
+Nexus uses **Walrus** as its backbone for storing massive AI datasets. Instead of trusting a centralized cloud provider, all data is:
+
+- **Erasure-coded** using RedStuff (RS2) across a decentralized network of storage nodes
+- **Content-addressed** via cryptographic Blob IDs
+- **Publicly retrievable** via the Walrus Aggregator with no authentication needed for reads
+
+| Operation | Endpoint | Method |
+|-----------|----------|--------|
+| Upload Dataset | `PUT publisher.walrus-testnet.walrus.space/v1/blobs` | HTTP PUT |
+| Download Dataset | `GET aggregator.walrus-testnet.walrus.space/v1/blobs/{blobId}` | HTTP GET |
+
+**Why Walrus?** Traditional IPFS pinning is unreliable. Centralized storage defeats decentralization. Walrus provides guaranteed availability through economic incentives and erasure coding, making it ideal for datasets that must be reliably available for AI agents purchasing access.
+
+---
+
+## Tatum Integration (RPC Gateway + MCP)
+
+Nexus uses **Tatum** at two critical layers:
+
+### 1. Sui RPC Gateway
+
+All blockchain interactions, from the frontend wallet to backend scripts, are routed through Tatum's managed Sui RPC gateway:
+
+```
+https://sui-testnet.gateway.tatum.io
+```
+
+This ensures reliable, low-latency access to the Sui network without running our own full node.
+
+### 2. Model Context Protocol (MCP) Server
+
+Nexus implements a **custom MCP server** that exposes domain-specific tools for AI agents, powered by Tatum's RPC infrastructure:
+
+| MCP Tool | Description | Backed By |
+|----------|-------------|-----------|
+| `search_nexus_datasets` | Find datasets by metadata and price range | Tatum `sui_queryEvents` |
+| `get_dataset_details` | Get full listing info including Blob ID | Tatum `sui_getObject` |
+| `get_walrus_blob` | Download raw dataset from Walrus | Walrus Aggregator |
+| `get_marketplace_stats` | Get marketplace overview | Tatum `sui_getObject` |
+| `verify_dataset_integrity` | Verify blob hash matches expected | Walrus Aggregator |
+
+The Tatum `@tatumio/blockchain-mcp` server runs alongside for generic blockchain data (wallet balances, transaction history, etc.).
+
+---
+
+## The Autonomous Flow
+
+```
+Data Provider                    AI Agent                      Sui + Walrus
+     |                               |                              |
+     |  1. Upload dataset to Walrus  |                              |
+     |------------------------------>|         Walrus Publisher     |
+     |        <-- Blob ID ----------|                              |
+     |                               |                              |
+     |  2. List on Sui (PTB)         |                              |
+     |------------------------------>|      Tatum Sui Gateway      |
+     |     DatasetListing created    |                              |
+     |                               |                              |
+     |                               |  3. Find me a dataset       |
+     |                               |     on stablecoin prices    |
+     |                               |-------- Nexus MCP --------->|
+     |                               |  <----- Listing found ------|
+     |                               |                              |
+     |                               |  4. Purchase (sign PTB)      |
+     |                               |-------- Tatum RPC --------->|
+     |    <-- SUI payment ----------|   DatasetAccess minted       |
+     |                               |                              |
+     |                               |  5. Download via Walrus      |
+     |                               |-------- Aggregator -------->|
+     |                               |  <----- Raw dataset --------|
+     |                               |                              |
+     |                               |  6. AI ingests new memory    |
+```
+
+---
+
+## Quick Start
 
 ### Prerequisites
+
 - [Node.js](https://nodejs.org/) (v20+)
 - [Sui CLI](https://docs.sui.io/build/install) (latest)
 - [Tatum API Key](https://tatum.io/) (free tier)
 
 ### Setup
+
 ```bash
-git clone https://github.com/YOUR_USERNAME/nexus.git
+git clone https://github.com/Manuel-dev01/nexus.git
 cd nexus
 
 # Configure environment
@@ -175,58 +189,58 @@ cd ../scripts && npx tsx seed_marketplace.ts
 # Start frontend
 cd ../frontend && npm install && npm run dev
 
-# Start MCP servers (in separate terminal)
+# Start MCP server (in separate terminal)
 cd ../mcp-server && npm install && npm start
 ```
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 nexus/
-├─ .agents/                        # Architecture decisions & task tracking
-├─ antigravity.md                  # Engineering manual (source of truth)
-├─ README.md                       # You are here
-├─ .env.example                    # Environment template
-├─ move/                           # Sui Smart Contracts
-│  ├─ Move.toml
-│  ├─ sources/
-│  │  ├─ nexus_marketplace.move    # Core marketplace logic
-│  │  └─ nexus_events.move         # Event definitions
-│  └─ tests/
-├─ frontend/                       # SvelteKit App
-│  ├─ src/
-│  │  ├─ routes/                   # Pages: /, /upload, /dataset/[id]
-│  │  └─ lib/
-│  │     ├─ walrus/                # Walrus upload/download wrappers
-│  │     └─ sui/                   # Tatum RPC config & PTB builders
-├─ mcp-server/                     # Nexus MCP Server (AI Agent layer)
-│  ├─ package.json
-│  └─ src/index.ts                 # Tool definitions
-└─ scripts/
-   ├─ deploy_contracts.sh
-   └─ seed_marketplace.ts          # Deterministic demo seeder
++-- .agents/                        # Architecture decisions and task tracking
++-- antigravity.md                  # Engineering manual (source of truth)
++-- README.md                       # You are here
++-- .env.example                    # Environment template
++-- move/                           # Sui Smart Contracts
+|   +-- Move.toml
+|   +-- sources/
+|   |   +-- nexus_marketplace.move  # Core marketplace logic
+|   |   +-- nexus_events.move       # Event definitions
+|   +-- tests/
++-- frontend/                       # SvelteKit App
+|   +-- src/
+|   |   +-- routes/                 # Pages: /, /upload, /dataset/[id]
+|   |   +-- lib/
+|   |       +-- walrus/             # Walrus upload/download wrappers
+|   |       +-- sui/                # Tatum RPC config and PTB builders
++-- mcp-server/                     # Nexus MCP Server (AI Agent layer)
+|   +-- package.json
+|   +-- src/index.ts                # Tool definitions
++-- scripts/
+|   +-- seed_marketplace.ts         # Deterministic demo seeder
+|   +-- spike/walrus-spike.ts       # Infrastructure validation
 ```
 
 ---
 
-## 🏆 Prize Track Alignment
+## Prize Track Alignment
 
 | Prize | How Nexus Qualifies |
 |-------|-------------------|
-| **🥇 Grand Prize** | Full-stack dApp: Move contracts + SvelteKit UI + AI agent integration |
-| **🐳 Best Walrus Integration** | All datasets stored on Walrus with RedStuff erasure coding. Upload, download, and blob management are core to the product. |
-| **⚡ Best Use of Tatum Tools** | Every Sui RPC call routes through Tatum gateway. Custom MCP server enables AI agents to autonomously interact with the marketplace. Two-server MCP composition (Tatum + Nexus). |
+| **Grand Prize** | Full-stack dApp: Move contracts + SvelteKit UI + AI agent integration |
+| **Best Walrus Integration** | All datasets stored on Walrus with RedStuff erasure coding. Upload, download, and blob management are core to the product. |
+| **Best Use of Tatum Tools** | Every Sui RPC call routes through Tatum gateway. Custom MCP server enables AI agents to autonomously interact with the marketplace. Two-server MCP composition (Tatum + Nexus). |
 
 ---
 
-## 📄 License
+## License
 
 MIT
 
 ---
 
 <p align="center">
-  <strong>Built with 🔮 for the Sui x Walrus x Tatum Hackathon</strong>
+  <strong>Built with care for the Sui x Walrus x Tatum Hackathon</strong>
 </p>
