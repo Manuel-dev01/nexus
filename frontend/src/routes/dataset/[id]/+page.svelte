@@ -321,7 +321,7 @@
             </div>
             <div class="sidebar-card__row">
               <span>Storage</span>
-              <span>Walrus Testnet</span>
+              <span>Walrus</span>
             </div>
           </div>
 

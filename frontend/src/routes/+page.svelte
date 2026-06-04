@@ -113,7 +113,7 @@
       <div>
         <div class="hero__badge">
           <span class="hero__badge-dot"></span>
-          Live on Sui Testnet
+          Decentralized AI Data Marketplace
         </div>
         <h1 class="hero__title">
           Memory, for
