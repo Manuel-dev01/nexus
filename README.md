@@ -130,6 +130,25 @@ Data Provider                    AI Agent                      Sui + Walrus
 
 ---
 
+## 🌐 Live Demo
+
+**Frontend:** https://nexus-l6qjs42ha-manuel-dev01s-projects.vercel.app
+
+**Deployed Contracts (Sui Testnet):**
+| Contract | Object ID |
+|----------|-----------|
+| Package | `0xd4121a4525729f9319db53d66967f0669a5eff6603009d346befe9bac5b74816` |
+| Marketplace | `0x7718f693693cac1637a972ae9a6cf14fdacb0d275a8c8b1aef34eb4b4dae1bce` |
+
+**Seeded Datasets:**
+| Dataset | Category | Price | Walrus Blob ID |
+|---------|----------|-------|----------------|
+| GPT-2 Embedding Vectors | embeddings | 0.5 SUI | `CxrYYF3kB_Pv9na0JNXTbVohjkemkFI0wL4kqnCK9Ls` |
+| Fine-Tuning Dataset | fine-tuning | 0.25 SUI | `Tzs6Sfk1aL4pysTUVxJRRjhf14TFJ4jY9VTNacFRz-U` |
+| LoRA Adapter Weights | model-weights | 1.0 SUI | `81FtoDN5MhiLhm0gQBvAEpwEGj5woOWS6PkfFaQgTEE` |
+
+---
+
 ## 🚀 Quick Start
 
 ### Prerequisites

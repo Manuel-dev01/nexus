@@ -4,10 +4,11 @@
   "description": "Nexus development and deployment scripts",
   "type": "module",
   "scripts": {
-    "spike": "tsx walrus-spike.ts",
+    "spike": "tsx spike/walrus-spike.ts",
     "seed": "tsx seed_marketplace.ts"
   },
   "dependencies": {
+    "@mysten/sui": "^2.0.0",
     "dotenv": "^16.4.0"
   },
   "devDependencies": {
