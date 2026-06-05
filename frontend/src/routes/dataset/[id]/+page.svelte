@@ -35,6 +35,15 @@
   // Access gating: true once we've confirmed the connected wallet owns a
   // DatasetAccess (or is the provider) for this listing.
   let hasAccess = $state(false);
+  // Why access is (or isn't) granted — drives the explanatory note + labels.
+  // 'provider' = you listed it · 'purchased' = you own a DatasetAccess · null = locked.
+  let accessReason: 'provider' | 'purchased' | null = $state(null);
+  // The wallet address currently authorized in the browser (no prompt). Lets us
+  // reflect access state on load instead of only after a click.
+  let connectedAddress: string | null = $state(null);
+  // Provider of an ENCRYPTED dataset: they own the listing but can't decrypt
+  // without their own DatasetAccess, so the download stays gated for them.
+  let providerOfEncrypted = $state(false);
   let purchaseSuccess: string | null = $state(null);
   // On-chain references for Suiscan links (the listing ID itself is wrapped and
   // not directly viewable — these point at the live object + its transaction).
@@ -97,12 +106,51 @@
         contentHash: fields.content_hash,
         storageEpochs: fields.storage_epochs ? parseInt(fields.storage_epochs) : null,
       };
+
+      // Reflect access state up-front (no wallet prompt) so the buttons/notes are
+      // accurate on load rather than only revealing the gate after a click.
+      await refreshAccess();
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load dataset';
       console.error('Error loading dataset:', err);
     } finally {
       loading = false;
     }
+  }
+
+  /**
+   * Determine whether the already-authorized wallet holds access to this listing,
+   * WITHOUT triggering a fresh connect prompt. Reads the adapter's restored
+   * accounts; if none, access stays locked until the user acts.
+   */
+  async function refreshAccess() {
+    if (!dataset) return;
+    const wallets = detectWallets();
+    const addr = (wallets[0]?.adapter as any)?.accounts?.[0]?.address ?? null;
+    connectedAddress = addr;
+    providerOfEncrypted = false;
+
+    if (!addr) {
+      hasAccess = false;
+      accessReason = null;
+      return;
+    }
+    if (addr === dataset.provider) {
+      // Provider can download their own *unencrypted* blob; an encrypted one still
+      // needs a DatasetAccess to decrypt, so keep it gated and explain why.
+      if (dataset.encrypted) {
+        hasAccess = false;
+        accessReason = null;
+        providerOfEncrypted = true;
+      } else {
+        hasAccess = true;
+        accessReason = 'provider';
+      }
+      return;
+    }
+    const owns = await hasPurchasedListing(addr, dataset.id);
+    hasAccess = owns;
+    accessReason = owns ? 'purchased' : null;
   }
 
   async function handlePurchase() {
@@ -141,8 +189,11 @@
       // Sign and execute
       const result = await signAndExecuteTransaction(wallet, tx);
 
-      // Purchase grants on-chain access — unlock the download immediately.
+      // Purchase mints a DatasetAccess to the buyer — unlock the download now and
+      // record that access came from a purchase (drives the explanatory note).
       hasAccess = true;
+      accessReason = 'purchased';
+      connectedAddress = (wallet.adapter as any)?.accounts?.[0]?.address ?? connectedAddress;
       purchaseSuccess = result.digest || result.transactionDigest || 'confirmed';
     } catch (err: any) {
       error = err.message || 'Purchase failed';
@@ -165,12 +216,16 @@
       }
       const wallet = wallets[0];
       const address = await connectWallet(wallet);
+      connectedAddress = address;
       const isProvider = address === dataset.provider;
       const owns = isProvider || (await hasPurchasedListing(address, dataset.id));
       if (!owns) {
-        throw new Error('Purchase required: no DatasetAccess for this listing was found in your wallet.');
+        hasAccess = false;
+        accessReason = null;
+        throw new Error('Purchase required: no DatasetAccess for this listing was found in your wallet. Buy the dataset to unlock the download.');
       }
       hasAccess = true;
+      accessReason = isProvider ? 'provider' : 'purchased';
 
       // Download the (possibly encrypted) bytes from Walrus. content_hash is over
       // the stored bytes, so integrity verification holds for ciphertext too.
@@ -361,16 +416,41 @@
           {/if}
 
           {#if dataset.active}
-            <button onclick={handlePurchase} disabled={purchasing} class="btn btn--primary" style="width: 100%; justify-content: center; margin-bottom: 10px;">
-              {purchasing ? 'Processing...' : 'Purchase Dataset'}
-            </button>
-            <button onclick={handleDownload} disabled={downloading} class="btn btn--ghost" style="width: 100%; justify-content: center;">
-              {downloading ? 'Downloading...' : hasAccess ? 'Download from Walrus' : 'Download (requires access)'}
-            </button>
+            {#if hasAccess}
+              <!-- Access confirmed → the buy button is redundant; lead with download. -->
+              <button onclick={handleDownload} disabled={downloading} class="btn btn--primary" style="width: 100%; justify-content: center;">
+                {downloading ? 'Downloading...' : dataset.encrypted ? 'Decrypt & Download' : 'Download from Walrus'}
+              </button>
+            {:else}
+              <button onclick={handlePurchase} disabled={purchasing} class="btn btn--primary" style="width: 100%; justify-content: center; margin-bottom: 10px;">
+                {purchasing ? 'Processing...' : 'Purchase Dataset'}
+              </button>
+              <button onclick={handleDownload} disabled={downloading} class="btn btn--ghost" style="width: 100%; justify-content: center;">
+                {downloading ? 'Checking access...' : 'Download (requires purchase)'}
+              </button>
+            {/if}
           {:else}
-            <button onclick={handleDownload} disabled={downloading} class="btn btn--primary" style="width: 100%; justify-content: center;">
-              {downloading ? 'Downloading...' : hasAccess ? 'Download Dataset' : 'Download (requires access)'}
+            <button onclick={handleDownload} disabled={downloading || !hasAccess} class="btn btn--primary" style="width: 100%; justify-content: center;">
+              {downloading ? 'Downloading...' : hasAccess ? (dataset.encrypted ? 'Decrypt & Download' : 'Download Dataset') : 'Delisted — access required'}
             </button>
+          {/if}
+
+          {#if hasAccess && accessReason}
+            <div style="font-family: var(--mono); font-size: 11.5px; color: var(--accent-deep); margin-top: 10px; text-align: center;">
+              {accessReason === 'provider'
+                ? 'You listed this dataset — download is enabled for the provider.'
+                : 'You own access to this dataset.'}
+            </div>
+          {:else if dataset.active}
+            <div style="font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-top: 10px; text-align: center;">
+              {#if providerOfEncrypted}
+                You listed this encrypted dataset — decryption still requires a DatasetAccess. Purchase it to decrypt.
+              {:else if connectedAddress}
+                Purchase mints an on-chain DatasetAccess that unlocks the download.
+              {:else}
+                Connect your wallet to check access, or purchase to unlock the download.
+              {/if}
+            </div>
           {/if}
 
           {#if purchaseSuccess}

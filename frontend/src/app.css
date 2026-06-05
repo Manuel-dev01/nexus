@@ -670,6 +670,24 @@ img { max-width: 100%; display: block; }
   color: var(--dim);
 }
 
+/* Demonstration-only pill — looks like the listing CTA but is not a control. */
+.hero-card__cta-demo {
+  font-family: var(--mono);
+  font-size: 13.5px;
+  letter-spacing: 0.01em;
+  padding: 13px 22px;
+  border-radius: 9px;
+  background: var(--accent);
+  color: #fff;
+  border: 1.5px solid var(--accent);
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  cursor: default;
+  user-select: none;
+  pointer-events: none;
+}
+
 .hero-card__mark {
   position: absolute;
   right: -14px;

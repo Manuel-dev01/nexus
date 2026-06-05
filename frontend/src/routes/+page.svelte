@@ -147,7 +147,8 @@
               420 <span class="hero-card__price-unit">SUI</span>
             </div>
           </div>
-          <button class="btn btn--primary">Purchase access</button>
+          <!-- Static illustration of a listing — not a real control. -->
+          <span class="hero-card__cta-demo">Purchase access</span>
         </div>
 
         <div class="hero-card__mark">

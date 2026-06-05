@@ -375,7 +375,8 @@
             <p style="font-family: var(--mono); font-size: 12.5px; color: var(--dim);">
               <strong style="color: var(--fg);">How it works:</strong> Your file is uploaded to Walrus decentralized storage using RedStuff erasure coding.
               A Sui transaction then creates a DatasetListing object linking the blob ID to your price.
-              Buyers pay in SUI to receive a DatasetAccess token granting download rights.
+              Buyers pay in the listing's token to receive a DatasetAccess token granting download rights
+              (and, for encrypted datasets, the Seal decryption key).
             </p>
           </div>
         </div>
