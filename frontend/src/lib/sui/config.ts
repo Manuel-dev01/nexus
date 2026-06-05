@@ -141,6 +141,54 @@ export async function getListingFields(
 /** Full Sui coin type a listing is priced in. Defaults to native SUI. */
 export const SUI_COIN_TYPE = '0x2::sui::SUI';
 
+// === Multi-token registry ===
+// The contract is generic over the payment coin type (Coin<T>); this registry is
+// the set of tokens the UI offers/displays. Add an entry to support a new token —
+// `symbol` for display, `coinType` the full Move type, `decimals` for formatting.
+export interface TokenInfo { symbol: string; coinType: string; decimals: number; }
+
+export const TOKENS: TokenInfo[] = [
+  { symbol: 'SUI', coinType: SUI_COIN_TYPE, decimals: 9 },
+  // Example — uncomment / edit to offer a testnet stablecoin:
+  // { symbol: 'USDC', coinType: '0x<pkg>::usdc::USDC', decimals: 6 },
+];
+
+/** Normalize a coin type to its "module::Struct" suffix (addresses differ in form). */
+function coinSuffix(t: string): string {
+  const p = (t || '').split('::');
+  return p.length >= 3 ? `${p[p.length - 2]}::${p[p.length - 1]}` : t;
+}
+
+/** On-chain coin_type arrives as a string (events) or a TypeName object (listing fields). */
+export function readCoinType(raw: any): string {
+  if (!raw) return SUI_COIN_TYPE;
+  if (typeof raw === 'string') return raw;
+  return raw.name || raw.fields?.name || SUI_COIN_TYPE;
+}
+
+export function tokenByType(coinType?: string): TokenInfo {
+  const ct = coinType || SUI_COIN_TYPE;
+  const suf = coinSuffix(ct);
+  return (
+    TOKENS.find((t) => coinSuffix(t.coinType) === suf) || {
+      symbol: suf.split('::').pop() || 'TOKEN',
+      coinType: ct,
+      decimals: 9,
+    }
+  );
+}
+
+export function coinSymbol(coinType?: string): string {
+  return tokenByType(coinType).symbol;
+}
+
+/** Format a raw on-chain amount in the token's smallest unit → "1.5000 SUI". */
+export function formatAmount(amount: number, coinType?: string): string {
+  const t = tokenByType(coinType);
+  const dp = t.decimals >= 9 ? 4 : 2;
+  return `${(amount / 10 ** t.decimals).toFixed(dp)} ${t.symbol}`;
+}
+
 export function buildListDatasetTransaction(params: {
   marketplaceId: string;
   name: string;
@@ -395,6 +443,36 @@ export async function hasPurchasedListing(address: string, listingId: string): P
     const content = obj.data?.content;
     return content?.dataType === 'moveObject' && content.fields?.listing_id === listingId;
   });
+}
+
+/** Return the buyer's DatasetAccess object id for a listing (needed for Seal decrypt). */
+export async function getAccessObjectForListing(
+  address: string,
+  listingId: string,
+): Promise<string | null> {
+  const objects = await rpc('suix_getOwnedObjects', [
+    address,
+    {
+      filter: { StructType: `${PACKAGE_ID}::nexus_marketplace::DatasetAccess` },
+      options: { showContent: true },
+    },
+  ]);
+  for (const obj of objects.data || []) {
+    const c = obj.data?.content;
+    if (c?.dataType === 'moveObject' && c.fields?.listing_id === listingId) {
+      return obj.data.objectId;
+    }
+  }
+  return null;
+}
+
+/** Convert an on-chain vector<u8> field (base64 string or number[]) to a hex string. */
+export function bytesFieldToHex(v: any): string {
+  let bytes: number[];
+  if (Array.isArray(v)) bytes = v;
+  else if (typeof v === 'string') bytes = Array.from(atob(v), (c) => c.charCodeAt(0));
+  else return '';
+  return bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
 }
 
 /**

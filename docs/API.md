@@ -9,8 +9,8 @@
 
 ### Module: `nexus_marketplace`
 
-#### `list_dataset`
-List a new dataset on the marketplace.
+#### `list_dataset<T>`
+List a new dataset on the marketplace. **Generic over the payment coin type `T`** (e.g. `0x2::sui::SUI`) — the listing is priced and must be bought in `T`.
 
 **Parameters:**
 | Parameter | Type | Description |
@@ -21,42 +21,69 @@ List a new dataset on the marketplace.
 | `category` | `String` | Category (e.g., "embeddings") |
 | `walrus_blob_id` | `String` | Walrus blob ID (non-empty) |
 | `size_bytes` | `u64` | File size in bytes |
-| `price` | `u64` | Price in MIST (> 0) |
+| `price` | `u64` | Price in the smallest unit of `T` (> 0) |
 | `content_hash` | `Option<String>` | Optional SHA256 hash |
 | `storage_epochs` | `Option<u64>` | Optional Walrus storage epochs |
+| `seal_policy_id` | `vector<u8>` | Seal encryption identity; empty `[]` = not encrypted |
 | `clock` | `&Clock` | Sui system clock |
 
-**Returns:** `ID` — The listing object ID
+**Returns:** `ID` — The listing object ID. The listing stores `coin_type` (= `T`) and `seal_policy_id`.
 
-**Events:** Emits `DatasetListed`
+**Events:** Emits `DatasetListed` (includes `coin_type: String` and `encrypted: bool`)
 
 ---
 
-#### `buy_dataset`
-Purchase a dataset listing.
+#### `buy_dataset<T>`
+Purchase a dataset listing. **`T` must match the listing's `coin_type`** (the token it's priced in).
 
 **Parameters:**
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `marketplace` | `&mut Marketplace` | Shared marketplace object |
 | `listing_id` | `ID` | Listing to purchase |
-| `payment` | `Coin<SUI>` | Payment (>= price) |
+| `payment` | `Coin<T>` | Payment in the listing's currency (>= price) |
 | `clock` | `&Clock` | Sui system clock |
 
 **Behavior:**
-- Takes exactly `price` from the payment: 2% (200 bps) to the marketplace treasury, the remaining 98% to the provider.
+- Takes exactly `price` from the payment: 2% (200 bps) platform fee paid to the marketplace **admin**, the remaining 98% to the provider.
 - Refunds any overpayment **from the buyer's own coin** (never the treasury).
-- Records the buyer in the listing's `purchasers` table and mints a `DatasetAccess` (owned) to the buyer.
+- Records the buyer in the listing's `purchasers` table and mints a `DatasetAccess` (owned, carrying the listing's `seal_policy_id`) to the buyer.
 
 **Error conditions (aborts):**
 | Code | When |
 |------|------|
+| `EWrongPaymentToken` | `T` ≠ the listing's `coin_type` |
 | `EAlreadyPurchased` | The buyer already owns access to this listing (no double-buy) |
 | `EInsufficientPayment` | `payment` < `price` |
 | `EListingNotActive` | Listing delisted, or the marketplace is paused |
 | `EListingNotFound` | `listing_id` not in the marketplace |
 
 **Events:** Emits `DatasetPurchased` (includes `platform_fee` and `provider_payout`)
+
+---
+
+#### `seal_approve` *(entry)*
+Seal access-control function. The Seal key servers dry-run this to decide whether to release decryption key shares — it succeeds only if the caller's `DatasetAccess` carries a `seal_policy_id` equal to `id`. Side-effect free.
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `id` | `vector<u8>` | The encryption identity (= the listing's `seal_policy_id`) |
+| `access` | `&DatasetAccess` | The buyer's proof-of-purchase object |
+
+**Aborts:** `ENoAccess` if the access object has no policy or it doesn't match `id`.
+
+---
+
+#### `has_purchased`
+View: whether an address already owns access to a listing.
+
+| Parameter | Type |
+|-----------|------|
+| `marketplace` | `&Marketplace` |
+| `listing_id` | `ID` |
+| `addr` | `address` |
+
+**Returns:** `bool`
 
 ---
 

@@ -1,9 +1,10 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { getListingFields, formatSui, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, mistToSui, hasPurchasedListing, explorerTx, explorerObject, explorerAccount } from '$lib/sui/config';
+  import { getListingFields, formatAmount, coinSymbol, readCoinType, bytesFieldToHex, getAccessObjectForListing, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, hasPurchasedListing, explorerTx, explorerObject, explorerAccount } from '$lib/sui/config';
   import { downloadFromWalrus, verifyBlob, formatFileSize } from '$lib/walrus/client';
-  import { detectWallets, connectWallet, signAndExecuteTransaction, truncateAddress, type WalletInfo } from '$lib/wallet/store';
+  import { detectWallets, connectWallet, signAndExecuteTransaction, signPersonalMessage, truncateAddress, type WalletInfo } from '$lib/wallet/store';
+  import { sealDecrypt } from '$lib/seal/client';
 
   interface Dataset {
     id: string;
@@ -13,6 +14,9 @@
     walrusBlobId: string;
     sizeBytes: number;
     price: number;
+    coinType: string;
+    encrypted: boolean;
+    sealPolicyHex: string;
     provider: string;
     active: boolean;
     listedAt: number;
@@ -36,6 +40,13 @@
   // not directly viewable — these point at the live object + its transaction).
   let listingObjectId: string | null = $state(null);
   let listingTxDigest: string | null = $state(null);
+
+  // vector<u8> seal_policy_id arrives as a base64 string or number[]; non-empty = encrypted.
+  function sealPolicyNonEmpty(seal: unknown): boolean {
+    if (Array.isArray(seal)) return seal.length > 0;
+    if (typeof seal === 'string') return seal.length > 0;
+    return false;
+  }
 
   let listingId = $derived(page.params.id);
 
@@ -76,6 +87,9 @@
         walrusBlobId: fields.walrus_blob_id,
         sizeBytes: parseInt(fields.size_bytes),
         price: parseInt(fields.price),
+        coinType: readCoinType(fields.coin_type),
+        encrypted: sealPolicyNonEmpty(fields.seal_policy_id),
+        sealPolicyHex: bytesFieldToHex(fields.seal_policy_id),
         provider: fields.provider,
         active: fields.active,
         listedAt: parseInt(fields.listed_at),
@@ -120,6 +134,7 @@
         marketplaceId: MARKETPLACE_ID,
         listingId: dataset.id,
         paymentAmount: dataset.price,
+        coinType: dataset.coinType,
         clockId: '0x6',
       });
 
@@ -142,24 +157,43 @@
     downloading = true;
     error = null;
     try {
-      // Access gate: require an on-chain DatasetAccess for this listing (or be
-      // the provider). Note: Walrus blobs are publicly addressable, so this
-      // enforces the *product* access right, not raw blob secrecy.
-      if (!hasAccess) {
-        const wallets = detectWallets();
-        if (wallets.length === 0) {
-          throw new Error('Connect a Sui wallet to download — access is gated by your on-chain DatasetAccess.');
+      // Access gate: require an on-chain DatasetAccess for this listing (or be the
+      // provider). Encrypted datasets also need the wallet to sign a Seal SessionKey.
+      const wallets = detectWallets();
+      if (wallets.length === 0) {
+        throw new Error('Connect a Sui wallet to download — access is gated by your on-chain DatasetAccess.');
+      }
+      const wallet = wallets[0];
+      const address = await connectWallet(wallet);
+      const isProvider = address === dataset.provider;
+      const owns = isProvider || (await hasPurchasedListing(address, dataset.id));
+      if (!owns) {
+        throw new Error('Purchase required: no DatasetAccess for this listing was found in your wallet.');
+      }
+      hasAccess = true;
+
+      // Download the (possibly encrypted) bytes from Walrus. content_hash is over
+      // the stored bytes, so integrity verification holds for ciphertext too.
+      const result = await downloadFromWalrus(dataset.walrusBlobId, dataset.contentHash || undefined);
+      let bytes: Uint8Array = new Uint8Array(result.data);
+
+      // Seal-encrypted: decrypt with a wallet-signed SessionKey + seal_approve proof.
+      if (dataset.encrypted) {
+        if (isProvider) {
+          throw new Error('This dataset is encrypted; decryption requires a DatasetAccess (purchase it to decrypt).');
         }
-        const address = await connectWallet(wallets[0]);
-        const owns = address === dataset.provider || await hasPurchasedListing(address, dataset.id);
-        if (!owns) {
-          throw new Error('Purchase required: no DatasetAccess for this listing was found in your wallet.');
-        }
-        hasAccess = true;
+        const accessId = await getAccessObjectForListing(address, dataset.id);
+        if (!accessId) throw new Error('No DatasetAccess object found to authorize decryption.');
+        bytes = await sealDecrypt({
+          ciphertext: bytes,
+          identityHex: dataset.sealPolicyHex,
+          accessObjectId: accessId,
+          address,
+          signPersonalMessage: (msg) => signPersonalMessage(wallet, msg),
+        });
       }
 
-      const result = await downloadFromWalrus(dataset.walrusBlobId, dataset.contentHash || undefined);
-      const blob = new Blob([result.data]);
+      const blob = new Blob([bytes as BlobPart]);
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -315,10 +349,15 @@
         <!-- Sidebar -->
         <div class="sidebar-card">
           <div class="sidebar-card__price">
-            {formatSui(dataset.price).replace(' SUI', '')}
-            <span class="sidebar-card__price-unit">SUI</span>
+            {formatAmount(dataset.price, dataset.coinType).split(' ')[0]}
+            <span class="sidebar-card__price-unit">{coinSymbol(dataset.coinType)}</span>
           </div>
           <div class="sidebar-card__status">{dataset.active ? 'Available' : 'Sold'}</div>
+          {#if dataset.encrypted}
+            <div style="font-family: var(--mono); font-size: 11px; color: var(--accent-deep); margin-top: 6px;">
+              🔒 Seal-encrypted — decryption unlocks on purchase
+            </div>
+          {/if}
 
           {#if dataset.active}
             <button onclick={handlePurchase} disabled={purchasing} class="btn btn--primary" style="width: 100%; justify-content: center; margin-bottom: 10px;">
@@ -355,7 +394,7 @@
             </div>
             <div class="sidebar-card__row">
               <span>Provider Receives</span>
-              <span>{formatSui(Math.floor(dataset.price * 0.98))}</span>
+              <span>{formatAmount(Math.floor(dataset.price * 0.98), dataset.coinType)}</span>
             </div>
             <div class="sidebar-card__row">
               <span>Storage</span>

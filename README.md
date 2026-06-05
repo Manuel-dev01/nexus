@@ -72,8 +72,8 @@ Nexus flips this model:
 
 | Contract | Object ID (click to verify on Suiscan) |
 |----------|-----------|
-| Package | [`0xb291fda4…de804c6`](https://suiscan.xyz/testnet/object/0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7) |
-| Marketplace | [`0x1cbd4543…3652bd99`](https://suiscan.xyz/testnet/object/0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430) |
+| Package | [`0x2797464…c6b393e7`](https://suiscan.xyz/testnet/object/0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7) |
+| Marketplace | [`0xac47e84…5f417430`](https://suiscan.xyz/testnet/object/0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430) |
 
 **Seeded Datasets:**
 
@@ -87,7 +87,14 @@ Nexus flips this model:
 
 ## Status
 
-**Code complete & verified** — Move contracts (12/12 tests, deployed), SvelteKit frontend (builds clean), and the 6-tool MCP server (`test-mcp` 9/1) are all wired against the live testnet deployment. Remaining work is operational only: re-set the Vercel env vars to the current addresses + redeploy the frontend, verify the demo video, and submit.
+**Code complete & verified** — Move contracts (**15/15 tests**, deployed `0x2797464…`), SvelteKit frontend (builds clean), and the **7-tool MCP server** (`test-mcp` 9/1) are all wired against the live testnet deployment.
+
+**Beyond the core marketplace, the contract + UI also implement:**
+- **Multi-token payments** — `list_dataset<T>` / `buy_dataset<T>` are generic over the payment coin type; each listing stores its `coin_type` and the UI shows/charges in that currency.
+- **Encrypted datasets (Seal)** — datasets can be encrypted client-side with [Mysten Seal](https://github.com/MystenLabs/seal); the on-chain `seal_approve(id, &DatasetAccess)` releases the decryption key only to buyers (token-gated decryption).
+- **Autonomous purchasing** — the MCP server can sign and submit `buy_dataset` itself with a custodial key (opt-in `NEXUS_ENABLE_SIGNING`), so the agent completes the trade end-to-end.
+
+Remaining: re-set the Vercel env vars to the current addresses + redeploy the frontend; a browser+wallet pass on the Seal encrypt→buy→decrypt loop (live key-server round-trips can't be verified headless); record/verify the demo; submit.
 
 → Full triaged status & checklist: **[docs/Blockers.md](docs/Blockers.md)**
 
@@ -243,7 +250,7 @@ nexus/
 |   +-- Move.toml
 |   +-- sources/
 |   |   +-- nexus_marketplace.move  # Core marketplace logic (objects, events, fees)
-|   +-- tests/                      # Move unit tests (12 tests)
+|   +-- tests/                      # Move unit tests (15 tests)
 +-- frontend/                       # SvelteKit 2 App (Svelte 5)
 |   +-- src/
 |   |   +-- routes/                 # Pages: /, /upload, /dataset/[id]

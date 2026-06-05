@@ -1,13 +1,16 @@
 <script lang="ts">
   import { uploadToWalrus, estimateUploadCost, formatCost, formatFileSize } from '$lib/walrus/client';
-  import { buildListDatasetTransaction, PACKAGE_ID, MARKETPLACE_ID, suiToMist, explorerTx } from '$lib/sui/config';
+  import { buildListDatasetTransaction, PACKAGE_ID, MARKETPLACE_ID, explorerTx, TOKENS, SUI_COIN_TYPE, tokenByType } from '$lib/sui/config';
   import { detectWallets, connectWallet, signAndExecuteTransaction, type WalletInfo } from '$lib/wallet/store';
+  import { sealEncrypt, newSealIdentity } from '$lib/seal/client';
 
   let file: File | null = $state(null);
+  let encrypt = $state(false);
   let name = $state('');
   let description = $state('');
   let category = $state('embeddings');
   let priceSui = $state(0.1);
+  let coinType = $state(SUI_COIN_TYPE);
   let uploading = $state(false);
   let progress = $state(0);
   let statusMessage = $state('');
@@ -53,9 +56,22 @@
     txDigest = null;
 
     try {
-      // Step 1: Upload to Walrus
+      // Step 0 (optional): Seal-encrypt before upload. The random identity becomes
+      // the listing's seal_policy_id; only owners of a matching DatasetAccess decrypt.
+      let uploadTarget: File = file;
+      let sealPolicyId: number[] = [];
+      if (encrypt) {
+        statusMessage = 'Encrypting with Seal (key servers)...';
+        const identity = newSealIdentity();
+        sealPolicyId = identity.bytes;
+        const plain = new Uint8Array(await file.arrayBuffer());
+        const cipher = await sealEncrypt(plain, identity.hex);
+        uploadTarget = new File([cipher as BlobPart], file.name + '.seal', { type: 'application/octet-stream' });
+      }
+
+      // Step 1: Upload to Walrus (the ciphertext when encrypted)
       statusMessage = 'Uploading file to Walrus decentralized storage...';
-      const walrusResult = await uploadToWalrus(file, 5, (p) => {
+      const walrusResult = await uploadToWalrus(uploadTarget, 5, (p) => {
         progress = p.percentage * 0.4; // 0-40%
       });
 
@@ -81,8 +97,8 @@
       progress = 50;
       statusMessage = 'Building listing transaction...';
 
-      // Step 3: Build PTB
-      const priceMist = suiToMist(priceSui);
+      // Step 3: Build PTB — price is in the selected token's smallest unit.
+      const priceMist = Math.floor(priceSui * 10 ** tokenByType(coinType).decimals);
 
       if (!PACKAGE_ID || !MARKETPLACE_ID) {
         // If contracts not deployed, simulate the listing
@@ -111,6 +127,8 @@
         price: priceMist,
         contentHash: walrusResult.sha256,
         storageEpochs: 5,
+        coinType,
+        sealPolicyId,
         clockId: '0x6', // Sui system clock
       });
 
@@ -263,17 +281,39 @@
             <textarea id="description" bind:value={description} rows="4" placeholder="Describe your dataset, its format, and potential use cases..." class="form-input"></textarea>
           </div>
 
-          <!-- Price -->
+          <!-- Price + Currency -->
           <div class="form-group">
             <label for="price" class="form-label">
-              Price (SUI) <span style="color: var(--faint); font-size: 11px;">2% platform fee</span>
+              Price <span style="color: var(--faint); font-size: 11px;">2% platform fee</span>
             </label>
-            <input id="price" type="number" bind:value={priceSui} min="0.01" step="0.01" class="form-input" />
+            <div style="display: grid; grid-template-columns: 1fr auto; gap: var(--sp-3);">
+              <input id="price" type="number" bind:value={priceSui} min="0.000001" step="0.01" class="form-input" />
+              <select bind:value={coinType} aria-label="Currency" class="form-input" style="min-width: 96px;">
+                {#each TOKENS as t}
+                  <option value={t.coinType}>{t.symbol}</option>
+                {/each}
+              </select>
+            </div>
             {#if file}
               <p style="font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-top: 6px;">
                 Estimated storage cost: {formatCost(estimatedCost)}
               </p>
             {/if}
+          </div>
+
+          <!-- Encryption (Seal) -->
+          <div class="form-group">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+              <input type="checkbox" bind:checked={encrypt} />
+              <span class="form-label" style="margin: 0;">🔒 Encrypt with Seal</span>
+            </label>
+            <p style="font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-top: 6px;">
+              {#if encrypt}
+                Encrypted client-side before upload — the decryption key is released on-chain only to addresses that purchase access.
+              {:else}
+                Off: the dataset is stored as-is and publicly readable from Walrus.
+              {/if}
+            </p>
           </div>
 
           <!-- Error -->

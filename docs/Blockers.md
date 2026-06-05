@@ -32,7 +32,7 @@
 
 | Area | Command | Result |
 |------|---------|--------|
-| Move unit tests | `sui move test` | **12/12 pass** (was 7, 3 stubbed) |
+| Move unit tests | `sui move test` | **15/15 pass** (multi-token + Seal guards incl.) |
 | Frontend typecheck | `npm run check` | **0 errors, 0 warnings** |
 | Frontend build | `npx vite build` | pass |
 | Contract E2E | `scripts/test-contracts.ts` | 11 pass / 6 skip — 3 listings on new pkg |
@@ -104,5 +104,5 @@ The Session 8d redeploy changed the package + marketplace addresses, so the earl
 ### 🔭 Stretch / out-of-MVP (CLAUDE.md §19)
 - [x] **MCP server signs `buy_dataset` itself** — opt-in `buy_dataset` tool (custodial key, `NEXUS_ENABLE_SIGNING`); signs via fullnode; dry-run verified (`DatasetPurchased` + `DatasetAccess`). Default-off/safe.
 - [x] **MCP server publish-ready for npm** — `bin`/shebang/`files`/`publishConfig` set; guide in [Publishing-MCP.md](./Publishing-MCP.md). *(Actual `npm publish` needs your npm login.)*
-- [x] **Multi-token payments — contract** — `Coin<T>`-generic `list_dataset<T>`/`buy_dataset<T>`; listing stores `coin_type`; deployed in `0x2797464…`; `buy_dataset<SUI>` dry-run success. **Frontend UI (currency picker/display, pay-in-token) ⏳ in progress.**
-- [x] **Encrypted previews — contract** — Seal access control via `seal_approve(id, &DatasetAccess)` + per-listing `seal_policy_id` + `encrypted` event flag; deployed + tested (15/15). **Frontend Seal encrypt-on-upload / decrypt-on-download (SessionKey + key servers) ⏳ in progress — needs browser+wallet testing.**
+- [x] **Multi-token payments** — contract: `Coin<T>`-generic `list_dataset<T>`/`buy_dataset<T>`, listing stores `coin_type` (deployed `0x2797464…`, `buy_dataset<SUI>` dry-run success). Frontend: currency picker on upload, token-aware price/display, `coinType` threaded through buy. `check` 0/0 + builds. *(Registry ships SUI; add a token = one `TOKENS` entry.)*
+- [x] **Encrypted previews (Seal)** — contract: `seal_approve(id, &DatasetAccess)` + per-listing `seal_policy_id` + `encrypted` flag (deployed + 15/15 tests). Frontend: `@mysten/seal` encrypt-on-upload (toggle) + decrypt-on-download (wallet-signed `SessionKey` → `seal_approve` → key servers). Scaffolded, `check` 0/0 + builds. **⚠️ Needs a browser+wallet test pass** (live key-server round-trips can't be verified headless).

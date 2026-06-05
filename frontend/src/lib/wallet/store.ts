@@ -119,6 +119,26 @@ export async function signAndExecuteTransaction(
   return result;
 }
 
+/**
+ * Sign a personal message with the connected wallet (used to authorize a Seal
+ * SessionKey). Returns the base64 signature.
+ */
+export async function signPersonalMessage(
+  wallet: WalletInfo,
+  message: Uint8Array
+): Promise<{ signature: string }> {
+  const feature = (wallet.adapter as any).features['sui:signPersonalMessage'];
+  if (!feature) {
+    throw new Error(`Wallet ${wallet.name} does not support signPersonalMessage`);
+  }
+  const account = (wallet.adapter as any).accounts?.[0];
+  if (!account) {
+    throw new Error('No connected account — please connect your wallet first.');
+  }
+  const result = await feature.signPersonalMessage({ message, account });
+  return { signature: result.signature };
+}
+
 // === Formatting ===
 
 /**

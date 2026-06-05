@@ -1,6 +1,6 @@
 # Nexus — End-to-End Testing Guide
 
-The canonical runbook to exercise **every layer** of Nexus start-to-finish: smart contracts → Walrus storage → Tatum RPC → MCP server (6 tools) → frontend → the full autonomous agent flow. Run it top to bottom; tick the boxes; log anything weird in §8.
+The canonical runbook to exercise **every layer** of Nexus start-to-finish: smart contracts → Walrus storage → Tatum RPC → MCP server (7 tools) → frontend → the full autonomous agent flow. Run it top to bottom; tick the boxes; log anything weird in §8.
 
 Each step is tagged **[auto]** (a command, no human judgement) or **[manual]** (needs a browser, wallet, or MCP client).
 
@@ -46,18 +46,21 @@ cd ../mcp-server && npm install
 ```bash
 cd move && sui move test          # (Windows: & "$env:USERPROFILE\bin\sui.exe" move test)
 ```
-**Expected — 12/12 pass**, including the failure-state guards:
+**Expected — 15/15 pass**, including the failure-state and multi-token/Seal guards:
 ```
-[ PASS ] test_buy_dataset
+[ PASS ] test_buy_dataset                                    # generic buy_dataset<SUI>
 [ PASS ] test_buy_dataset_overpayment_refunds_from_payment   # refund comes from buyer, not treasury
 [ PASS ] test_buy_delisted_listing_fails
 [ PASS ] test_buy_insufficient_payment_fails
+[ PASS ] test_buy_with_wrong_token_fails                     # EWrongPaymentToken (multi-token)
 [ PASS ] test_delist_by_non_provider_fails
 [ PASS ] test_double_purchase_fails                          # EAlreadyPurchased
+[ PASS ] test_seal_policy_propagates_and_approves            # Seal: access matches identity
+[ PASS ] test_seal_approve_rejects_wrong_identity            # Seal: wrong identity rejected
 [ PASS ] test_full_lifecycle
 [ PASS ] test_list_dataset(+_max_price/_zero_price_fails)
 [ PASS ] test_marketplace_initialization
-Test result: OK. Total tests: 12; passed: 12; failed: 0
+Test result: OK. Total tests: 15; passed: 15; failed: 0
 ```
 
 Then verify the **deployed** contract on testnet:
@@ -66,7 +69,7 @@ cd ../scripts && npx tsx test-contracts.ts
 ```
 **Expected — `Results: 11 passed, 0 failed, 6 skipped`** (the 6 skips are browser/wallet-only). Confirms: package + both… one module live, marketplace shared, fee = 200 bps, not paused, 3+ `DatasetListed` events queryable.
 
-- [ ] `sui move test` → 12/12
+- [ ] `sui move test` → 15/15
 - [ ] `test-contracts.ts` → 11 passed
 
 ---
@@ -145,7 +148,7 @@ Under **Resources**, open `marketplace://overview` → JSON marketplace snapshot
 
 - [ ] `test-mcp.ts` → 9 passed
 - [ ] Server boots and logs the Tatum endpoint
-- [ ] All 6 tools return sensible results in the Inspector
+- [ ] All 7 tools return sensible results in the Inspector
 - [ ] `get_dataset_details` returns full metadata (regression check for the wrapped-object bug)
 
 ### 4d. (Optional) Real agent narrative in Claude Desktop  [manual]
@@ -170,8 +173,13 @@ Also test the **deployed** site (`https://nexus-place.vercel.app`) — but only 
 | 6 | Download gating | On a dataset you DON'T own, "Download" is labelled *(requires access)* and refuses without a `DatasetAccess` | B-6 (access gating) |
 | 7 | Purchase flow | Click Purchase → wallet signs `buy_dataset` → "access unlocked" + Suiscan tx; Download now works | F-7 (wallet account), buy PTB |
 | 8 | "View raw blob on Walrus" | Opens raw bytes (gibberish for binary) — **this is correct** | §7 note |
-| 9 | Mobile | Resize / phone: burger menu opens overlay, links + wallet work | responsive |
-| 10 | Error states | Disconnect wallet then try to buy → clear inline error, no crash | — |
+| 9 | Multi-token display | Each card + the detail sidebar show the listing's **currency** (read from `coin_type`); upload form has a **currency picker** | multi-token UI |
+| 10 | Seal encrypt (upload) | Toggle **🔒 Encrypt with Seal** ON, upload → status shows "Encrypting…", the ciphertext (not the file) lands on Walrus; the new card shows a **🔒 Seal-encrypted** badge | Seal encrypt |
+| 11 | Seal decrypt (download) | Buy an encrypted dataset from a 2nd wallet → Download → wallet signs a **SessionKey** message → file decrypts to plaintext. A non-owner / provider is refused. | Seal decrypt — **needs live key servers** |
+| 12 | Mobile | Resize / phone: burger menu opens overlay, links + wallet work | responsive |
+| 13 | Error states | Disconnect wallet then try to buy → clear inline error, no crash | — |
+
+> **Seal (rows 10–11) is the one flow that can only be validated here, in a browser** — it makes live key-server round-trips and needs a wallet to sign the SessionKey. If decryption fails, capture the console error: the likely culprits are the threshold (1-of-2 by default), the `seal_policy_id` byte encoding, or the SessionKey signature format.
 
 ---
 
@@ -183,8 +191,8 @@ End-to-end, the product's headline claim — *an AI agent buys its own memory*:
 2. **Agent** (MCP, §4c/4d) `search_nexus_datasets` → finds it by metadata.
 3. **Agent** `get_dataset_details` → reads price + `walrusBlobId`.
 4. **Agent** `check_dataset_purchase` → confirms it doesn't already own it.
-5. **Human/wallet** signs `buy_dataset` (the agent prepares; a wallet signs — server-side signing is the next stretch item). → `DatasetAccess` minted, fee to treasury, payout to provider.
-6. **Agent** `get_walrus_blob` → downloads the raw data, `verify_dataset_integrity` → hash matches.
+5. **Purchase** — either the **agent signs it itself** via the opt-in `buy_dataset` tool (custodial key, `NEXUS_ENABLE_SIGNING=true`), or a **wallet** signs the PTB. → `DatasetAccess` minted, 2% fee to admin, payout to provider.
+6. **Agent** `get_walrus_blob` → downloads the raw data, `verify_dataset_integrity` → hash matches. (If the dataset is Seal-encrypted, decryption happens in the frontend via the buyer's `DatasetAccess`.)
 
 - [ ] The whole chain works without manual data shuttling between steps.
 
@@ -213,10 +221,10 @@ End-to-end, the product's headline claim — *an AI agent buys its own memory*:
 | 1 · Contracts (`move test`, `test-contracts`) | ☐ |
 | 2 · Walrus round-trip | ☐ |
 | 3 · Tatum RPC | ☐ |
-| 4 · MCP server (suite + 6 tools) | ☐ |
+| 4 · MCP server (suite + 7 tools) | ☐ |
 | 5 · Frontend (local, + deployed after B-2) | ☐ |
 | 6 · Full autonomous flow | ☐ |
 
 **When something breaks:** note the layer + exact step + console/RPC output here, fix, then **re-run that layer** before moving on. Update [docs/Blockers.md](./Blockers.md) if it's a real defect.
 
-**Green-light for stretch work** (MCP server-side `buy_dataset` signing, encrypted previews, multi-token) once §1–§6 all pass on both local and the deployed (post-B-2) site.
+**Stretch features are implemented** (MCP server-side `buy_dataset` signing ✅, multi-token `Coin<T>` ✅, Seal encrypted previews ✅ — all on-chain + frontend, deployed `0x2797464…`, 15/15 Move tests). The **last validation step** is rows §5/10–11 (Seal encrypt→buy→decrypt) in a real browser+wallet, plus the deployed-site pass after **B-2** (re-set Vercel env vars + redeploy).

@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { queryMarketplaceEvents, MARKETPLACE_ID, formatSui } from '$lib/sui/config';
+  import { queryMarketplaceEvents, MARKETPLACE_ID, formatAmount, coinSymbol } from '$lib/sui/config';
   import { formatFileSize } from '$lib/walrus/client';
   import Mark from '$lib/components/Mark.svelte';
 
@@ -12,6 +12,8 @@
     walrusBlobId: string;
     sizeBytes: number;
     price: number;
+    coinType: string;
+    encrypted: boolean;
     provider: string;
     active: boolean;
     purchaseCount: number;
@@ -57,6 +59,8 @@
           walrusBlobId: parsed.walrus_blob_id || '',
           sizeBytes: parseInt(parsed.size_bytes) || 0,
           price: parseInt(parsed.price) || 0,
+          coinType: parsed.coin_type || '0x2::sui::SUI',
+          encrypted: !!parsed.encrypted,
           provider: parsed.provider || '',
           active: true,
           purchaseCount: 0,
@@ -245,8 +249,8 @@
                 Quality: <span class="dataset-card__quality-val">0.94</span>
               </span>
               <span class="dataset-card__price">
-                {formatSui(dataset.price).replace(' SUI', '')}
-                <span class="dataset-card__price-unit">SUI</span>
+                {formatAmount(dataset.price, dataset.coinType).split(' ')[0]}
+                <span class="dataset-card__price-unit">{coinSymbol(dataset.coinType)}</span>
               </span>
             </div>
           </a>

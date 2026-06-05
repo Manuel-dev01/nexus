@@ -51,8 +51,8 @@ Nexus is a decentralized AI model and memory marketplace built on Sui. Data prov
 | Object | Type | Owner | Purpose |
 |--------|------|-------|---------|
 | `Marketplace` | Shared | Shared | Holds `listings: Table<ID, DatasetListing>`, treasury, fee config, stats |
-| `DatasetListing` | Wrapped in the `listings` table | Marketplace | A dataset for sale; includes a `purchasers: Table<address,bool>` to block double-buys |
-| `DatasetAccess` | Owned | Buyer | Proves purchase, grants download |
+| `DatasetListing` | Wrapped in the `listings` table | Marketplace | A dataset for sale; stores `coin_type` (payment token) + `seal_policy_id` (encryption identity) + a `purchasers: Table<address,bool>` to block double-buys |
+| `DatasetAccess` | Owned | Buyer | Proves purchase, grants download; carries the `seal_policy_id` used by `seal_approve` |
 | `ProviderCap` | Owned | Provider | Capability required to delist |
 
 > Because each `DatasetListing` is wrapped inside the marketplace table, it is **not** directly fetchable via `sui_getObject` (returns `notExists`). Both the frontend and the MCP server read listings via `suix_getDynamicFieldObject` on the table, and discover them via `DatasetListed` events.
@@ -61,12 +61,14 @@ Nexus is a decentralized AI model and memory marketplace built on Sui. Data prov
 
 | Function | Purpose |
 |----------|---------|
-| `list_dataset` | Create a new listing (provider); returns a `ProviderCap` |
-| `buy_dataset` | Purchase a listing (buyer); blocks double-buys (`EAlreadyPurchased`), refunds overpayment from the buyer's coin |
+| `list_dataset<T>` | Create a new listing (provider) priced in coin type `T`; returns a `ProviderCap` |
+| `buy_dataset<T>` | Purchase a listing (buyer) paying in `T` (must match `coin_type`); blocks double-buys (`EAlreadyPurchased`) + wrong token (`EWrongPaymentToken`), refunds overpayment from the buyer's coin |
+| `seal_approve` *(entry)* | Seal access control — key servers dry-run it to release decryption keys only to holders of a matching `DatasetAccess` |
 | `delist_dataset` | Remove listing (provider only, via `ProviderCap`) |
-| `get_listing` / `get_marketplace_stats` | View listing / marketplace stats |
-| `has_purchased` | Whether an address already bought a listing |
+| `get_listing` / `get_marketplace_stats` / `has_purchased` | Views |
 | `withdraw_fees` / `update_fee` / `set_paused` | Admin controls |
+
+**Multi-token & encryption:** the contract is **generic over the payment coin type** (`Coin<T>`), and supports **Seal** encrypted datasets — a listing's `seal_policy_id` is the encryption identity, and `seal_approve(id, &DatasetAccess)` gates decryption on owning a matching access object.
 
 **Economic Model:**
 - Prices in MIST (1 SUI = 1,000,000,000 MIST)
