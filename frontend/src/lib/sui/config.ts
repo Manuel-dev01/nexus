@@ -263,12 +263,14 @@ export function buildBuyDatasetTransaction(params: {
   const tx = new Transaction();
 
   const coinType = params.coinType ?? SUI_COIN_TYPE;
+  // The on-chain coin_type is the canonical TypeName form (e.g.
+  // "0000…0002::sui::SUI"), which is NOT string-equal to "0x2::sui::SUI" — compare
+  // by the normalized "module::Struct" suffix so SUI listings split from gas.
+  const isSui = coinSuffix(coinType) === coinSuffix(SUI_COIN_TYPE);
 
   // SUI is split from the gas coin; other tokens are split from a provided coin.
   // The contract refunds any rounding remainder from the buyer's own coin.
-  const source = coinType === SUI_COIN_TYPE
-    ? tx.gas
-    : tx.object(params.paymentCoinId!);
+  const source = isSui ? tx.gas : tx.object(params.paymentCoinId!);
   const [paymentCoin] = tx.splitCoins(source, [params.paymentAmount]);
 
   // Call buy_dataset<T>

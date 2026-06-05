@@ -19,6 +19,17 @@
   let success = $state(false);
   let txDigest: string | null = $state(null);
 
+  // Required fields still missing — mirrors the submit button's disabled condition
+  // so we can tell the user exactly why the button is disabled.
+  let missingFields = $derived(
+    [
+      !file && 'a file',
+      !name.trim() && 'a name',
+      !description.trim() && 'a description',
+      !(priceSui > 0) && 'a price greater than 0',
+    ].filter(Boolean) as string[]
+  );
+
   const categories = [
     { value: 'embeddings', label: 'Embeddings' },
     { value: 'fine-tuning', label: 'Fine-Tuning' },
@@ -46,8 +57,10 @@
   }
 
   async function handleSubmit() {
-    if (!file || !name || !description || priceSui <= 0) {
-      error = 'Please fill in all fields and select a file';
+    // `|| !file` is redundant (missingFields already covers it) but narrows `file`
+    // to non-null for TypeScript across the awaits below.
+    if (missingFields.length > 0 || !file) {
+      error = `Please add ${missingFields.join(', ')} before uploading.`;
       return;
     }
 
@@ -341,9 +354,9 @@
           <!-- Submit -->
           <button
             type="submit"
-            disabled={uploading || !file || !name || !description || priceSui <= 0}
+            disabled={uploading || missingFields.length > 0}
             class="btn btn--primary"
-            style="width: 100%; justify-content: center; padding: 16px 24px;"
+            style="width: 100%; justify-content: center; padding: 16px 24px; opacity: {uploading || missingFields.length > 0 ? 0.6 : 1}; cursor: {uploading || missingFields.length > 0 ? 'not-allowed' : 'pointer'};"
           >
             {#if uploading}
               {statusMessage || 'Processing...'}
@@ -351,6 +364,11 @@
               Upload and List Dataset
             {/if}
           </button>
+          {#if !uploading && missingFields.length > 0}
+            <p style="font-family: var(--mono); font-size: 12px; color: var(--accent-deep); text-align: center; margin-top: 10px;">
+              Add {missingFields.join(', ')} to enable upload.
+            </p>
+          {/if}
 
           <!-- Note -->
           <div style="margin-top: var(--sp-5); padding: var(--sp-4); background: var(--bone-alt); border-radius: var(--r-md); border: 1px solid var(--line-soft);">
