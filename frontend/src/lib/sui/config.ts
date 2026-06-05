@@ -75,6 +75,37 @@ export async function getObject(id: string, options: Record<string, boolean>) {
   return rpc('sui_getObject', [id, options]);
 }
 
+// DatasetListing objects are stored *inside* the marketplace's `listings` Table,
+// which wraps them — so `sui_getObject(listingId)` returns `notExists`. They must
+// be read as dynamic fields of the table (key type `0x2::object::ID`).
+let listingsTableIdCache: string | null = null;
+
+async function getListingsTableId(marketplaceId: string): Promise<string> {
+  if (listingsTableIdCache) return listingsTableIdCache;
+  const mk = await getObject(marketplaceId, { showContent: true });
+  const id = (mk?.data?.content as any)?.fields?.listings?.fields?.id?.id;
+  if (!id) throw new Error('Could not resolve the marketplace listings table');
+  listingsTableIdCache = id;
+  return id;
+}
+
+/**
+ * Read the raw on-chain fields of a DatasetListing from the marketplace table.
+ * Returns null if the listing isn't found.
+ */
+export async function getListingFields(
+  marketplaceId: string,
+  listingId: string,
+): Promise<Record<string, any> | null> {
+  const tableId = await getListingsTableId(marketplaceId);
+  const df = await rpc('suix_getDynamicFieldObject', [
+    tableId,
+    { type: '0x2::object::ID', value: listingId },
+  ]);
+  // The Field wraps the listing under content.fields.value.fields.
+  return (df?.data?.content as any)?.fields?.value?.fields ?? null;
+}
+
 // === PTB Builders for Marketplace Operations ===
 
 /**
@@ -225,13 +256,11 @@ export async function getMarketplaceStats(marketplaceId: string) {
  * @returns Promise with listing details
  */
 export async function getListingDetails(marketplaceId: string, listingId: string) {
-  const result = await getObject(listingId, { showContent: true, showOwner: true });
+  const fields = await getListingFields(marketplaceId, listingId);
 
-  if (!result.data?.content || result.data.content.dataType !== 'moveObject') {
+  if (!fields) {
     throw new Error('Failed to fetch listing data');
   }
-
-  const fields = result.data.content.fields as any;
 
   return {
     id: listingId,

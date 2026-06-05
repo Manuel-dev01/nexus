@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { getObject, formatSui, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, mistToSui, hasPurchasedListing } from '$lib/sui/config';
+  import { getListingFields, formatSui, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, mistToSui, hasPurchasedListing } from '$lib/sui/config';
   import { downloadFromWalrus, verifyBlob, formatFileSize } from '$lib/walrus/client';
   import { detectWallets, connectWallet, signAndExecuteTransaction, truncateAddress, type WalletInfo } from '$lib/wallet/store';
 
@@ -52,13 +52,13 @@
     }
 
     try {
-      const result = await getObject(id, { showContent: true, showOwner: true });
+      // Listings live inside the marketplace table — fetch via dynamic field,
+      // not sui_getObject (which returns notExists for wrapped objects).
+      const fields = await getListingFields(MARKETPLACE_ID, id);
 
-      if (!result.data?.content || result.data.content.dataType !== 'moveObject') {
+      if (!fields) {
         throw new Error('Dataset not found');
       }
-
-      const fields = result.data.content.fields as any;
 
       dataset = {
         id,
