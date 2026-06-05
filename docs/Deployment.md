@@ -82,8 +82,8 @@ vercel --prod
 **Environment Variables (set in Vercel Dashboard):**
 | Name | Value |
 |------|-------|
-| `PUBLIC_NEXUS_PACKAGE_ID` | `0x86208eab6fcdadc33273cc65fed9b43177d7c65105ef88134eb635652d258788` |
-| `PUBLIC_NEXUS_MARKETPLACE_ID` | `0xaea5cb73bb7d4b8a6cac69be6dbd7d736cf73ec62563ac87f125c4f0c45f30b2` |
+| `PUBLIC_NEXUS_PACKAGE_ID` | `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6` |
+| `PUBLIC_NEXUS_MARKETPLACE_ID` | `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99` |
 
 Note: Contract addresses are also hardcoded in `frontend/src/lib/sui/config.ts` as fallbacks.
 
@@ -130,8 +130,8 @@ Add to MCP client config:
 
 | Component | ID/URL |
 |-----------|--------|
-| Package | `0x86208eab6fcdadc33273cc65fed9b43177d7c65105ef88134eb635652d258788` |
-| Marketplace | `0xaea5cb73bb7d4b8a6cac69be6dbd7d736cf73ec62563ac87f125c4f0c45f30b2` |
+| Package | `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6` |
+| Marketplace | `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99` |
 | Chain ID | `4c78adac` (testnet) |
 | Sui RPC | `https://sui-testnet.gateway.tatum.io` |
 | Walrus Publisher | `https://publisher.walrus-testnet.walrus.space` |

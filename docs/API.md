@@ -4,7 +4,7 @@
 
 ### Package
 ```
-0x86208eab6fcdadc33273cc65fed9b43177d7c65105ef88134eb635652d258788
+0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6
 ```
 
 ### Module: `nexus_marketplace`

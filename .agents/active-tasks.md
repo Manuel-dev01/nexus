@@ -55,7 +55,7 @@
 ## Phase 4 — Seed, Polish, Record (Day 6: June 5-6)
 
 - [x] Write `seed_marketplace.ts` (3 real datasets) — repaired in Session 8, verified via on-chain dry-run
-- [x] Deploy Move contracts to Sui Testnet — redeployed Session 8 (package `0x8620…`, marketplace `0xaea5…`) after the B-4/B-5 contract fixes; re-seeded with 3 datasets
+- [x] Deploy Move contracts to Sui Testnet — redeployed Session 8 (package `0xb291…`, marketplace `0x1cbd…`) after the B-4/B-5 contract fixes; re-seeded with 3 datasets
 - [x] Deploy frontend to Vercel (⚠️ pending dashboard: disable auth + set env vars)
 - [x] Polish UI animations and error states
 - [ ] Record 2-3 min demo video per §17

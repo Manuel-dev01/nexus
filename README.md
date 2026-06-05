@@ -72,16 +72,16 @@ Nexus flips this model:
 
 | Contract | Object ID |
 |----------|-----------|
-| Package | `0x86208eab6fcdadc33273cc65fed9b43177d7c65105ef88134eb635652d258788` |
-| Marketplace | `0xaea5cb73bb7d4b8a6cac69be6dbd7d736cf73ec62563ac87f125c4f0c45f30b2` |
+| Package | `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6` |
+| Marketplace | `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99` |
 
 **Seeded Datasets:**
 
 | Dataset | Category | Price | Walrus Blob ID |
 |---------|----------|-------|----------------|
-| GPT-2 Embedding Vectors | embeddings | 0.5 SUI | `K1Ib_CNCEr7rG9rOiPMYd3NGxiF9x4DtlLoHNJJjEy8` |
+| GPT-2 Embedding Vectors | embeddings | 0.5 SUI | `BBCZfBAb6FI8zHOHa7ztwPBUHvcIJd3X9TARW7RVX8w` |
 | Fine-Tuning Dataset | fine-tuning | 0.25 SUI | `aGir1MudixR_2MezEKRfKHzqwXkBzD1xd9iaFhamZQ0` |
-| LoRA Adapter Weights | model-weights | 1.0 SUI | `foce6UR-SRib69uQJf9i6NCbve6fzGZmxbtCr9WzVV8` |
+| LoRA Adapter Weights | model-weights | 1.0 SUI | `Zkw-aZCSW8EMuZHmXh_fq-J3qlVnQcPEj9t9M46WOeQ` |
 
 ---
 
