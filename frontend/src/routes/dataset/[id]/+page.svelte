@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { getListingFields, formatSui, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, mistToSui, hasPurchasedListing } from '$lib/sui/config';
+  import { getListingFields, formatSui, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, mistToSui, hasPurchasedListing, explorerTx, explorerObject, explorerAccount } from '$lib/sui/config';
   import { downloadFromWalrus, verifyBlob, formatFileSize } from '$lib/walrus/client';
   import { detectWallets, connectWallet, signAndExecuteTransaction, truncateAddress, type WalletInfo } from '$lib/wallet/store';
 
@@ -32,6 +32,10 @@
   // DatasetAccess (or is the provider) for this listing.
   let hasAccess = $state(false);
   let purchaseSuccess: string | null = $state(null);
+  // On-chain references for Suiscan links (the listing ID itself is wrapped and
+  // not directly viewable — these point at the live object + its transaction).
+  let listingObjectId: string | null = $state(null);
+  let listingTxDigest: string | null = $state(null);
 
   let listingId = $derived(page.params.id);
 
@@ -54,11 +58,15 @@
     try {
       // Listings live inside the marketplace table — fetch via dynamic field,
       // not sui_getObject (which returns notExists for wrapped objects).
-      const fields = await getListingFields(MARKETPLACE_ID, id);
+      const listing = await getListingFields(MARKETPLACE_ID, id);
 
-      if (!fields) {
+      if (!listing) {
         throw new Error('Dataset not found');
       }
+
+      const fields = listing.fields;
+      listingObjectId = listing.objectId;
+      listingTxDigest = listing.lastTxDigest;
 
       dataset = {
         id,
@@ -327,7 +335,10 @@
 
           {#if purchaseSuccess}
             <div class="alert" style="margin-top: var(--sp-4); border: 1px solid var(--accent); background: var(--accent-soft); color: var(--accent-deep); font-family: var(--mono); font-size: 12px; word-break: break-all;">
-              Purchase confirmed — access unlocked. TX: {purchaseSuccess}
+              Purchase confirmed — access unlocked.<br />
+              <a href={explorerTx(purchaseSuccess)} target="_blank" rel="noopener noreferrer" style="color: var(--accent-deep); text-decoration: underline;">
+                View transaction on Suiscan &rarr;
+              </a>
             </div>
           {/if}
 
@@ -364,15 +375,35 @@
                 rel="noopener noreferrer"
                 style="font-family: var(--mono); font-size: 12.5px; color: var(--accent-deep);"
               >
-                View on Walrus Aggregator &rarr;
+                View raw blob on Walrus &rarr;
               </a>
+              {#if listingObjectId}
+                <a
+                  href={explorerObject(listingObjectId)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style="font-family: var(--mono); font-size: 12.5px; color: var(--accent-deep);"
+                >
+                  View listing on Suiscan &rarr;
+                </a>
+              {/if}
+              {#if listingTxDigest}
+                <a
+                  href={explorerTx(listingTxDigest)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style="font-family: var(--mono); font-size: 12.5px; color: var(--accent-deep);"
+                >
+                  View transaction on Suiscan &rarr;
+                </a>
+              {/if}
               <a
-                href="https://suiexplorer.com/object/{dataset.id}?network=testnet"
+                href={explorerAccount(dataset.provider)}
                 target="_blank"
                 rel="noopener noreferrer"
                 style="font-family: var(--mono); font-size: 12.5px; color: var(--accent-deep);"
               >
-                View on Sui Explorer &rarr;
+                View provider on Suiscan &rarr;
               </a>
             </div>
           </div>

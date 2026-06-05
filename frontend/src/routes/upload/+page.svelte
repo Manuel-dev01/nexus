@@ -1,6 +1,6 @@
 <script lang="ts">
   import { uploadToWalrus, estimateUploadCost, formatCost, formatFileSize } from '$lib/walrus/client';
-  import { buildListDatasetTransaction, PACKAGE_ID, MARKETPLACE_ID, suiToMist } from '$lib/sui/config';
+  import { buildListDatasetTransaction, PACKAGE_ID, MARKETPLACE_ID, suiToMist, explorerTx } from '$lib/sui/config';
   import { detectWallets, connectWallet, signAndExecuteTransaction, type WalletInfo } from '$lib/wallet/store';
 
   let file: File | null = $state(null);
@@ -184,7 +184,13 @@
         </p>
         {#if txDigest}
           <p style="font-family: var(--mono); font-size: 12px; color: var(--faint); margin-bottom: var(--sp-6); word-break: break-all;">
-            TX: {txDigest}
+            {#if txDigest.startsWith('simulated')}
+              TX: {txDigest}
+            {:else}
+              <a href={explorerTx(txDigest)} target="_blank" rel="noopener noreferrer" style="color: var(--accent-deep); text-decoration: underline;">
+                View transaction on Suiscan &rarr;
+              </a>
+            {/if}
           </p>
         {/if}
         <div style="display: flex; justify-content: center; gap: var(--sp-4);">

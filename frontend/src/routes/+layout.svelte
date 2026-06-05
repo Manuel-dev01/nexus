@@ -9,6 +9,7 @@
 		truncateAddress,
 		type WalletInfo
 	} from '$lib/wallet/store';
+	import { explorerObject, PACKAGE_ID, MARKETPLACE_ID } from '$lib/sui/config';
 
 	let { children } = $props();
 
@@ -277,8 +278,9 @@
 			<div class="footer__col">
 				<div class="footer__col-heading">Protocol</div>
 				<div class="footer__col-items">
-					<a href="https://suiexplorer.com" class="footer__link">Sui Explorer</a>
-					<a href="https://aggregator.walrus-testnet.walrus.space" class="footer__link">Walrus Aggregator</a>
+					<a href={explorerObject(PACKAGE_ID)} target="_blank" rel="noopener noreferrer" class="footer__link">Contract on Suiscan</a>
+					<a href={explorerObject(MARKETPLACE_ID)} target="_blank" rel="noopener noreferrer" class="footer__link">Marketplace on Suiscan</a>
+					<a href="https://aggregator.walrus-testnet.walrus.space" target="_blank" rel="noopener noreferrer" class="footer__link">Walrus Aggregator</a>
 				</div>
 			</div>
 

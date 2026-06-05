@@ -24,6 +24,13 @@ export const PACKAGE_ID = import.meta.env.PUBLIC_NEXUS_PACKAGE_ID
 export const MARKETPLACE_ID = import.meta.env.PUBLIC_NEXUS_MARKETPLACE_ID
   || '0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99';
 
+// === Explorer (Suiscan) link builders ===
+// Sui Explorer is deprecated and redirects to Suiscan, so link there directly.
+export const EXPLORER_BASE = 'https://suiscan.xyz/testnet';
+export const explorerTx = (digest: string) => `${EXPLORER_BASE}/tx/${digest}`;
+export const explorerObject = (id: string) => `${EXPLORER_BASE}/object/${id}`;
+export const explorerAccount = (addr: string) => `${EXPLORER_BASE}/account/${addr}`;
+
 // === Browser-safe RPC ===
 
 /**
@@ -89,21 +96,38 @@ async function getListingsTableId(marketplaceId: string): Promise<string> {
   return id;
 }
 
+export interface ListingOnChain {
+  /** The listing's on-chain fields (name, price, walrus_blob_id, ...). */
+  fields: Record<string, any>;
+  /** The live dynamic-field object that holds the listing (viewable on Suiscan).
+   *  NOTE: the listing ID itself is NOT directly viewable — it's wrapped here. */
+  objectId: string;
+  /** Most recent transaction that touched the listing (viewable on Suiscan). */
+  lastTxDigest: string;
+}
+
 /**
- * Read the raw on-chain fields of a DatasetListing from the marketplace table.
- * Returns null if the listing isn't found.
+ * Read a DatasetListing from the marketplace table (it's a wrapped dynamic field,
+ * not a standalone object). Returns null if the listing isn't found.
  */
 export async function getListingFields(
   marketplaceId: string,
   listingId: string,
-): Promise<Record<string, any> | null> {
+): Promise<ListingOnChain | null> {
   const tableId = await getListingsTableId(marketplaceId);
   const df = await rpc('suix_getDynamicFieldObject', [
     tableId,
     { type: '0x2::object::ID', value: listingId },
   ]);
+  const data = df?.data;
   // The Field wraps the listing under content.fields.value.fields.
-  return (df?.data?.content as any)?.fields?.value?.fields ?? null;
+  const fields = (data?.content as any)?.fields?.value?.fields;
+  if (!fields) return null;
+  return {
+    fields,
+    objectId: data.objectId,
+    lastTxDigest: data.previousTransaction,
+  };
 }
 
 // === PTB Builders for Marketplace Operations ===
@@ -256,11 +280,13 @@ export async function getMarketplaceStats(marketplaceId: string) {
  * @returns Promise with listing details
  */
 export async function getListingDetails(marketplaceId: string, listingId: string) {
-  const fields = await getListingFields(marketplaceId, listingId);
+  const listing = await getListingFields(marketplaceId, listingId);
 
-  if (!fields) {
+  if (!listing) {
     throw new Error('Failed to fetch listing data');
   }
+
+  const fields = listing.fields;
 
   return {
     id: listingId,

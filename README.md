@@ -70,10 +70,10 @@ Nexus flips this model:
 
 **Deployed Contracts (Sui Testnet):**
 
-| Contract | Object ID |
+| Contract | Object ID (click to verify on Suiscan) |
 |----------|-----------|
-| Package | `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6` |
-| Marketplace | `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99` |
+| Package | [`0xb291fda4…de804c6`](https://suiscan.xyz/testnet/object/0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6) |
+| Marketplace | [`0x1cbd4543…3652bd99`](https://suiscan.xyz/testnet/object/0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99) |
 
 **Seeded Datasets:**
 
