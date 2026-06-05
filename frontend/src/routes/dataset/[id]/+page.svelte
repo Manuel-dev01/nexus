@@ -3,7 +3,8 @@
   import { onMount } from 'svelte';
   import { getListingFields, formatAmount, coinSymbol, readCoinType, bytesFieldToHex, getAccessObjectForListing, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, hasPurchasedListing, explorerTx, explorerObject, explorerAccount } from '$lib/sui/config';
   import { downloadFromWalrus, verifyBlob, formatFileSize } from '$lib/walrus/client';
-  import { detectWallets, connectWallet, signAndExecuteTransaction, signPersonalMessage, truncateAddress, type WalletInfo } from '$lib/wallet/store';
+  import { signAndExecuteTransaction, signPersonalMessage, truncateAddress } from '$lib/wallet/store';
+  import { walletConn } from '$lib/wallet/connection.svelte';
   // Seal is loaded ON DEMAND (dynamic import below) — eager import broke hydration.
 
   interface Dataset {
@@ -106,10 +107,8 @@
         contentHash: fields.content_hash,
         storageEpochs: fields.storage_epochs ? parseInt(fields.storage_epochs) : null,
       };
-
-      // Reflect access state up-front (no wallet prompt) so the buttons/notes are
-      // accurate on load rather than only revealing the gate after a click.
-      await refreshAccess();
+      // Access is re-evaluated by the $effect below whenever the dataset loads or
+      // the shared wallet connection changes.
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load dataset';
       console.error('Error loading dataset:', err);
@@ -118,15 +117,21 @@
     }
   }
 
+  // Re-evaluate access whenever the dataset loads or the shared wallet
+  // connection changes (connect/disconnect). Reading walletConn.address +
+  // dataset registers both as effect dependencies.
+  $effect(() => {
+    walletConn.address;
+    if (dataset) refreshAccess();
+  });
+
   /**
-   * Determine whether the already-authorized wallet holds access to this listing,
-   * WITHOUT triggering a fresh connect prompt. Reads the adapter's restored
-   * accounts; if none, access stays locked until the user acts.
+   * Determine whether the connected wallet holds access to this listing. Uses the
+   * shared, explicitly-connected address only — it never silently auto-connects.
    */
   async function refreshAccess() {
     if (!dataset) return;
-    const wallets = detectWallets();
-    const addr = (wallets[0]?.adapter as any)?.accounts?.[0]?.address ?? null;
+    const addr = walletConn.address;
     connectedAddress = addr;
     providerOfEncrypted = false;
 
@@ -153,26 +158,25 @@
     accessReason = owns ? 'purchased' : null;
   }
 
+  /** Explicit, visible wallet connection (used by the sidebar gate). */
+  async function handleConnect() {
+    try {
+      await walletConn.connect();
+    } catch (err) {
+      console.error('Connect failed:', err);
+    }
+  }
+
   async function handlePurchase() {
     if (!dataset) return;
+    if (!walletConn.connected || !walletConn.wallet) {
+      error = 'Connect your wallet first to purchase.';
+      return;
+    }
     purchasing = true;
     error = null;
 
     try {
-      // Check wallet
-      const wallets = detectWallets();
-      if (wallets.length === 0) {
-        throw new Error('No Sui wallet detected. Please install Sui Wallet browser extension.');
-      }
-
-      let wallet: WalletInfo;
-      try {
-        wallet = wallets[0];
-        await connectWallet(wallet);
-      } catch (err: any) {
-        throw new Error(`Wallet connection failed: ${err.message}`);
-      }
-
       if (!PACKAGE_ID || !MARKETPLACE_ID) {
         throw new Error('Smart contracts not deployed yet. Please deploy contracts first.');
       }
@@ -186,14 +190,14 @@
         clockId: '0x6',
       });
 
-      // Sign and execute
-      const result = await signAndExecuteTransaction(wallet, tx);
+      // Sign and execute with the already-connected wallet (no silent connect).
+      const result = await signAndExecuteTransaction(walletConn.wallet, tx);
 
       // Purchase mints a DatasetAccess to the buyer — unlock the download now and
       // record that access came from a purchase (drives the explanatory note).
       hasAccess = true;
       accessReason = 'purchased';
-      connectedAddress = (wallet.adapter as any)?.accounts?.[0]?.address ?? connectedAddress;
+      connectedAddress = walletConn.address;
       purchaseSuccess = result.digest || result.transactionDigest || 'confirmed';
     } catch (err: any) {
       error = err.message || 'Purchase failed';
@@ -205,18 +209,16 @@
 
   async function handleDownload() {
     if (!dataset) return;
+    if (!walletConn.connected || !walletConn.wallet || !walletConn.address) {
+      error = 'Connect your wallet first — access is gated by your on-chain DatasetAccess.';
+      return;
+    }
     downloading = true;
     error = null;
     try {
       // Access gate: require an on-chain DatasetAccess for this listing (or be the
       // provider). Encrypted datasets also need the wallet to sign a Seal SessionKey.
-      const wallets = detectWallets();
-      if (wallets.length === 0) {
-        throw new Error('Connect a Sui wallet to download — access is gated by your on-chain DatasetAccess.');
-      }
-      const wallet = wallets[0];
-      const address = await connectWallet(wallet);
-      connectedAddress = address;
+      const address = walletConn.address;
       const isProvider = address === dataset.provider;
       const owns = isProvider || (await hasPurchasedListing(address, dataset.id));
       if (!owns) {
@@ -245,7 +247,7 @@
           identityHex: dataset.sealPolicyHex,
           accessObjectId: accessId,
           address,
-          signPersonalMessage: (msg) => signPersonalMessage(wallet, msg),
+          signPersonalMessage: (msg) => signPersonalMessage(walletConn.wallet!, msg),
         });
       }
 
@@ -415,7 +417,15 @@
             </div>
           {/if}
 
-          {#if dataset.active}
+          {#if !walletConn.connected}
+            <!-- Connection is an explicit, visible step before any purchase/download. -->
+            <button onclick={handleConnect} disabled={walletConn.connecting} class="btn btn--primary" style="width: 100%; justify-content: center;">
+              {walletConn.connecting ? 'Connecting...' : 'Connect Wallet'}
+            </button>
+            <div style="font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-top: 10px; text-align: center;">
+              Connect your Sui wallet to purchase or download — access is gated by your on-chain DatasetAccess.
+            </div>
+          {:else if dataset.active}
             {#if hasAccess}
               <!-- Access confirmed → the buy button is redundant; lead with download. -->
               <button onclick={handleDownload} disabled={downloading} class="btn btn--primary" style="width: 100%; justify-content: center;">
@@ -435,22 +445,22 @@
             </button>
           {/if}
 
-          {#if hasAccess && accessReason}
-            <div style="font-family: var(--mono); font-size: 11.5px; color: var(--accent-deep); margin-top: 10px; text-align: center;">
-              {accessReason === 'provider'
-                ? 'You listed this dataset — download is enabled for the provider.'
-                : 'You own access to this dataset.'}
-            </div>
-          {:else if dataset.active}
-            <div style="font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-top: 10px; text-align: center;">
-              {#if providerOfEncrypted}
-                You listed this encrypted dataset — decryption still requires a DatasetAccess. Purchase it to decrypt.
-              {:else if connectedAddress}
-                Purchase mints an on-chain DatasetAccess that unlocks the download.
-              {:else}
-                Connect your wallet to check access, or purchase to unlock the download.
-              {/if}
-            </div>
+          {#if walletConn.connected}
+            {#if hasAccess && accessReason}
+              <div style="font-family: var(--mono); font-size: 11.5px; color: var(--accent-deep); margin-top: 10px; text-align: center;">
+                {accessReason === 'provider'
+                  ? 'You listed this dataset — download is enabled for the provider.'
+                  : 'You own access to this dataset.'}
+              </div>
+            {:else if dataset.active}
+              <div style="font-family: var(--mono); font-size: 11.5px; color: var(--faint); margin-top: 10px; text-align: center;">
+                {#if providerOfEncrypted}
+                  You listed this encrypted dataset — decryption still requires a DatasetAccess. Purchase it to decrypt.
+                {:else}
+                  Purchase mints an on-chain DatasetAccess that unlocks the download.
+                {/if}
+              </div>
+            {/if}
           {/if}
 
           {#if purchaseSuccess}

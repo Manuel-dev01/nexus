@@ -47,4 +47,12 @@ Desktop.ini
 *.log
 logs/
 CLAUDE.md
+
+# Agent memory bank — local only
+.agents/
+
+# Internal/process docs — kept locally, not published to the public repo
 docs/Demo-Verification-Flow.md
+docs/Blockers.md
+docs/Deployment.md
+docs/Publishing-MCP.md

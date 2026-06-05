@@ -154,7 +154,7 @@ Under **Resources**, open `marketplace://overview` → JSON marketplace snapshot
 - [ ] `get_dataset_details` returns full metadata (regression check for the wrapped-object bug)
 
 ### 4d. (Optional) Real agent narrative in Claude Desktop  [manual]
-Add the **two-server** config from [Deployment.md → Configure in an AI client](./Deployment.md#4-configure-in-an-ai-client-two-server-composition) (Nexus + `@tatumio/blockchain-mcp`), restart Claude Desktop, then ask in natural language: *"Search Nexus for an embeddings dataset under 1 SUI, show its details, and tell me if 0x14c6… already owns it."* The model should chain `search → details → check_dataset_purchase`.
+Add the **two-server** config (Nexus + `@tatumio/blockchain-mcp`) from the [README → MCP Server](../README.md#2-model-context-protocol-mcp-server), restart Claude Desktop, then ask in natural language: *"Search Nexus for an embeddings dataset under 1 SUI, show its details, and tell me if 0x14c6… already owns it."* The model should chain `search → details → check_dataset_purchase`.
 
 ---
 
@@ -227,6 +227,6 @@ End-to-end, the product's headline claim — *an AI agent buys its own memory*:
 | 5 · Frontend (local, + deployed after B-2) | ☐ |
 | 6 · Full autonomous flow | ☐ |
 
-**When something breaks:** note the layer + exact step + console/RPC output here, fix, then **re-run that layer** before moving on. Update [docs/Blockers.md](./Blockers.md) if it's a real defect.
+**When something breaks:** note the layer + exact step + console/RPC output here, fix, then **re-run that layer** before moving on.
 
 **Stretch features are implemented** (MCP server-side `buy_dataset` signing ✅, multi-token `Coin<T>` ✅, Seal encrypted previews ✅ — all on-chain + frontend, deployed `0x2797464…`, 15/15 Move tests). The **last validation step** is rows §5/10–11 (Seal encrypt→buy→decrypt) in a real browser+wallet, plus the deployed-site pass after **B-2** (re-set Vercel env vars + redeploy).

@@ -4,21 +4,20 @@
 	import { onMount } from 'svelte';
 	import {
 		detectWallets,
-		connectWallet,
-		disconnectWallet,
 		truncateAddress,
 		type WalletInfo
 	} from '$lib/wallet/store';
+	import { walletConn } from '$lib/wallet/connection.svelte';
 	import { explorerObject, PACKAGE_ID, MARKETPLACE_ID } from '$lib/sui/config';
 
 	let { children } = $props();
 
 	let scrolled = $state(false);
 	let mobileMenuOpen = $state(false);
-	let walletAddress: string | null = $state(null);
-	let walletName: string | null = $state(null);
-	let walletConnecting = $state(false);
-	let walletError: string | null = $state(null);
+	// Connection state is shared app-wide via walletConn so every page agrees.
+	let walletAddress = $derived(walletConn.address);
+	let walletName = $derived(walletConn.walletName);
+	let walletConnecting = $derived(walletConn.connecting);
 	let availableWallets: WalletInfo[] = $state([]);
 	let showWalletMenu = $state(false);
 
@@ -50,32 +49,17 @@
 	}
 
 	async function handleConnect(wallet: WalletInfo) {
-		walletConnecting = true;
-		walletError = null;
 		showWalletMenu = false;
 		closeMobileMenu();
-
 		try {
-			const address = await connectWallet(wallet);
-			walletAddress = address;
-			walletName = wallet.name;
-		} catch (err: any) {
-			walletError = err.message || 'Failed to connect wallet';
+			await walletConn.connect(wallet);
+		} catch (err) {
 			console.error('Wallet connection failed:', err);
-		} finally {
-			walletConnecting = false;
 		}
 	}
 
 	async function handleDisconnect() {
-		if (availableWallets.length > 0 && walletName) {
-			const wallet = availableWallets.find(w => w.name === walletName);
-			if (wallet) {
-				await disconnectWallet(wallet);
-			}
-		}
-		walletAddress = null;
-		walletName = null;
+		await walletConn.disconnect();
 		closeMobileMenu();
 	}
 
@@ -233,10 +217,10 @@
 	</div>
 {/if}
 
-{#if walletError}
+{#if walletConn.error}
 	<div class="wallet-error">
-		{walletError}
-		<button onclick={() => walletError = null}>&times;</button>
+		{walletConn.error}
+		<button onclick={() => (walletConn.error = null)}>&times;</button>
 	</div>
 {/if}
 

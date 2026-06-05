@@ -64,9 +64,9 @@ Nexus flips this model:
 
 ## Live Demo
 
-**Frontend:** https://nexus-l6qjs42ha-manuel-dev01s-projects.vercel.app
+**Frontend:** https://nexus-place.vercel.app
 
-> ⚠️ **Public access:** the Vercel project must have **Deployment Protection → Vercel Authentication disabled** for this URL to load without a Vercel login. If you hit a login wall, that toggle is still on — see [docs/Deployment.md](docs/Deployment.md#required-vercel-dashboard-settings).
+> ⚠️ **Public access:** the Vercel project must have **Deployment Protection → Vercel Authentication disabled** for this URL to load without a Vercel login. If you hit a login wall, that toggle is still on — disable it in the Vercel dashboard (Settings → Deployment Protection).
 
 **Deployed Contracts (Sui Testnet):**
 
@@ -75,13 +75,17 @@ Nexus flips this model:
 | Package | [`0x2797464…c6b393e7`](https://suiscan.xyz/testnet/object/0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7) |
 | Marketplace | [`0xac47e84…5f417430`](https://suiscan.xyz/testnet/object/0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430) |
 
-**Seeded Datasets:**
+**Seeded Datasets:** **20 datasets, real files on Walrus, 4 per category** (language, vision, embeddings, fine-tuning, model-weights). Seeded via the idempotent [`scripts/seed_marketplace.ts`](scripts/seed_marketplace.ts) (skips names already on-chain, so it's safe to re-run / extend).
 
-| Dataset | Category | Price | Walrus Blob ID |
-|---------|----------|-------|----------------|
-| GPT-2 Embedding Vectors | embeddings | 0.5 SUI | `njQKp7aFXHLNd6PzKGcZYQEt9-UU2m3a9nASmIC8OU8` |
-| Fine-Tuning Dataset | fine-tuning | 0.25 SUI | `aGir1MudixR_2MezEKRfKHzqwXkBzD1xd9iaFhamZQ0` |
-| LoRA Adapter Weights | model-weights | 1.0 SUI | `rusSEWN3gYhFC-FZicd9KU1BCXt-HIvT9gF1Yc-tIQo` |
+| Category | Examples | Price range |
+|----------|----------|-------------|
+| **language** | IMDB Sentiment (CSV), CoNLL-2003 NER (JSONL), WMT EN–DE pairs, SQuAD v2 QA | 0.15–0.30 SUI |
+| **vision** | MNIST (uint8), CIFAR-10 batch, COCO annotations (JSON), CLIP embeddings | 0.20–0.50 SUI |
+| **embeddings** | GPT-2 vectors, Sentence-BERT MiniLM, OpenAI text-embedding-3 | 0.30–0.50 SUI |
+| **fine-tuning** | Alpaca pairs, OpenAssistant ChatML, Glaive function-calling, CNN/DailyMail | 0.25–0.30 SUI |
+| **model-weights** | LoRA (Llama-3 / Mistral-7B), TinyLlama Q4 quantized, DPO reward head | 0.60–1.0 SUI |
+
+> Each dataset is a genuine file stored on Walrus (real blob IDs, RedStuff erasure coding); contents are representative samples in the correct format rather than the original public corpora. Original blob IDs: GPT-2 `njQKp7aFXHLNd6PzKGcZYQEt9-UU2m3a9nASmIC8OU8`, Fine-Tuning `aGir1MudixR_2MezEKRfKHzqwXkBzD1xd9iaFhamZQ0`, LoRA `rusSEWN3gYhFC-FZicd9KU1BCXt-HIvT9gF1Yc-tIQo`.
 
 ---
 
@@ -95,8 +99,6 @@ Nexus flips this model:
 - **Autonomous purchasing** — the MCP server can sign and submit `buy_dataset` itself with a custodial key (opt-in `NEXUS_ENABLE_SIGNING`), so the agent completes the trade end-to-end.
 
 Remaining: re-set the Vercel env vars to the current addresses + redeploy the frontend; a browser+wallet pass on the Seal encrypt→buy→decrypt loop (live key-server round-trips can't be verified headless); record/verify the demo; submit.
-
-→ Full triaged status & checklist: **[docs/Blockers.md](docs/Blockers.md)**
 
 ---
 
@@ -155,7 +157,26 @@ npx -y @olanuel/nexus-mcp-server
 ```
 → [`@olanuel/nexus-mcp-server`](https://www.npmjs.com/package/@olanuel/nexus-mcp-server) on npm.
 
-> Full API reference: [docs/API.md](docs/API.md) · Wiring both MCP servers into an AI client: [docs/Deployment.md](docs/Deployment.md#4-configure-in-an-ai-client-two-server-composition) · Publishing guide: [docs/Publishing-MCP.md](docs/Publishing-MCP.md).
+**Wiring it into an AI client (two-server composition):** add both servers to your client's `mcpServers` config — the Nexus server for domain tools, plus `@tatumio/blockchain-mcp` for generic chain data:
+
+```json
+{
+  "mcpServers": {
+    "nexus": {
+      "command": "npx",
+      "args": ["-y", "@olanuel/nexus-mcp-server"],
+      "env": { "TATUM_API_KEY": "<your-tatum-key>" }
+    },
+    "tatum": {
+      "command": "npx",
+      "args": ["-y", "@tatumio/blockchain-mcp"],
+      "env": { "TATUM_API_KEY": "<your-tatum-key>" }
+    }
+  }
+}
+```
+
+> Full API reference: [docs/API.md](docs/API.md).
 
 ---
 
@@ -198,7 +219,7 @@ Data Provider                    AI Agent                      Sui + Walrus
 - [Sui CLI](https://docs.sui.io/build/install) (latest)
 - [Tatum API Key](https://tatum.io/) (free tier)
 
-> **Note:** the contracts in [Live Demo](#live-demo) are already deployed to Sui Testnet **and pre-seeded with the 3 datasets above.** You only need the deploy + seed steps below if you want to run your *own* independent instance.
+> **Note:** the contracts in [Live Demo](#live-demo) are already deployed to Sui Testnet **and pre-seeded with the 20 datasets above.** You only need the deploy + seed steps below if you want to run your *own* independent instance.
 
 ### Setup
 
@@ -227,8 +248,6 @@ cd ../scripts && npm install && npx tsx seed_marketplace.ts
 cd ../mcp-server && npm install && npm run build && npm start
 ```
 
-> For full deployment instructions, see [docs/Deployment.md](docs/Deployment.md).
-
 ---
 
 ## Documentation
@@ -237,9 +256,7 @@ cd ../mcp-server && npm install && npm run build && npm start
 |----------|-------------|
 | [Architecture](docs/Architecture.md) | System architecture, data flows, security model |
 | [API Reference](docs/API.md) | Smart contract API, Walrus API, MCP tools, Sui RPC |
-| [Deployment Guide](docs/Deployment.md) | Contract deployment, frontend deploy, MCP server setup |
 | [Testing Guide](docs/Testing-Guide.md) | End-to-end runbook: contracts → Walrus → Tatum → MCP → frontend → full flow |
-| [Blockers & Gaps](docs/Blockers.md) | Triaged open issues, verified state, and what's been fixed |
 
 ---
 
@@ -250,8 +267,7 @@ nexus/
 +-- docs/                           # Project documentation
 |   +-- Architecture.md             # System architecture
 |   +-- API.md                      # API reference
-|   +-- Deployment.md               # Deployment guide
-|   +-- Demo-Verification-Flow.md   # Demo and verification guide
+|   +-- Testing-Guide.md            # End-to-end testing runbook
 +-- move/                           # Sui Smart Contracts
 |   +-- Move.toml
 |   +-- sources/

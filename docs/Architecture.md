@@ -118,7 +118,7 @@ Nexus is a decentralized AI model and memory marketplace built on Sui. Data prov
 | `verify_dataset_integrity` | Check blob hash |
 | `buy_dataset` *(opt-in)* | Server signs & submits the purchase with a custodial key |
 
-The stock `@tatumio/blockchain-mcp` server is composed alongside it (see [Deployment.md](./Deployment.md#4-configure-in-an-ai-client-two-server-composition)).
+The stock `@tatumio/blockchain-mcp` server is composed alongside it in the AI client's `mcpServers` config (the Nexus server for domain tools + the Tatum server for generic chain data) — see the two-server config in the [README](../README.md#2-model-context-protocol-mcp-server).
 
 **Resources:**
 

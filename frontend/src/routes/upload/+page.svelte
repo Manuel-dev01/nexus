@@ -1,7 +1,8 @@
 <script lang="ts">
   import { uploadToWalrus, estimateUploadCost, formatCost, formatFileSize } from '$lib/walrus/client';
   import { buildListDatasetTransaction, PACKAGE_ID, MARKETPLACE_ID, explorerTx, TOKENS, SUI_COIN_TYPE, tokenByType } from '$lib/sui/config';
-  import { detectWallets, connectWallet, signAndExecuteTransaction, type WalletInfo } from '$lib/wallet/store';
+  import { signAndExecuteTransaction } from '$lib/wallet/store';
+  import { walletConn } from '$lib/wallet/connection.svelte';
   // Seal (@mysten/seal) is a heavy crypto lib loaded ON DEMAND via dynamic import
   // below — importing it eagerly broke this route's hydration in the browser.
 
@@ -56,11 +57,27 @@
     event.preventDefault();
   }
 
+  /** Explicit, visible wallet connection (used by the gate below). */
+  async function handleConnect() {
+    try {
+      await walletConn.connect();
+    } catch (err) {
+      console.error('Connect failed:', err);
+    }
+  }
+
   async function handleSubmit() {
     // `|| !file` is redundant (missingFields already covers it) but narrows `file`
     // to non-null for TypeScript across the awaits below.
     if (missingFields.length > 0 || !file) {
       error = `Please add ${missingFields.join(', ')} before uploading.`;
+      return;
+    }
+
+    // Require an explicit wallet connection BEFORE uploading to Walrus, so we
+    // never upload and then fail at the signing step.
+    if (!walletConn.connected || !walletConn.wallet) {
+      error = 'Connect your wallet first to list a dataset.';
       return;
     }
 
@@ -93,21 +110,10 @@
       progress = 40;
       statusMessage = 'File uploaded to Walrus. Preparing Sui transaction...';
 
-      // Step 2: Check wallet connection
-      const wallets = detectWallets();
-      let wallet: WalletInfo;
-      let address: string;
-
-      if (wallets.length === 0) {
-        throw new Error('No Sui wallet detected. Please install Sui Wallet browser extension.');
-      }
-
-      try {
-        wallet = wallets[0];
-        address = await connectWallet(wallet);
-      } catch (err: any) {
-        throw new Error(`Wallet connection failed: ${err.message}. Please connect your wallet and try again.`);
-      }
+      // Step 2: Use the already-connected wallet (connection is required above).
+      // Re-read + guard so TypeScript narrows it to non-null across the awaits.
+      const wallet = walletConn.wallet;
+      if (!wallet) throw new Error('Wallet disconnected — please reconnect and try again.');
 
       progress = 50;
       statusMessage = 'Building listing transaction...';
@@ -351,23 +357,38 @@
             </div>
           {/if}
 
-          <!-- Submit -->
-          <button
-            type="submit"
-            disabled={uploading || missingFields.length > 0}
-            class="btn btn--primary"
-            style="width: 100%; justify-content: center; padding: 16px 24px; opacity: {uploading || missingFields.length > 0 ? 0.6 : 1}; cursor: {uploading || missingFields.length > 0 ? 'not-allowed' : 'pointer'};"
-          >
-            {#if uploading}
-              {statusMessage || 'Processing...'}
-            {:else}
-              Upload and List Dataset
-            {/if}
-          </button>
-          {#if !uploading && missingFields.length > 0}
-            <p style="font-family: var(--mono); font-size: 12px; color: var(--accent-deep); text-align: center; margin-top: 10px;">
-              Add {missingFields.join(', ')} to enable upload.
+          <!-- Submit — connection is an explicit step before uploading/listing. -->
+          {#if !walletConn.connected}
+            <button
+              type="button"
+              onclick={handleConnect}
+              disabled={walletConn.connecting}
+              class="btn btn--primary"
+              style="width: 100%; justify-content: center; padding: 16px 24px;"
+            >
+              {walletConn.connecting ? 'Connecting...' : 'Connect Wallet'}
+            </button>
+            <p style="font-family: var(--mono); font-size: 12px; color: var(--faint); text-align: center; margin-top: 10px;">
+              Connect your Sui wallet to upload to Walrus and list on Sui.
             </p>
+          {:else}
+            <button
+              type="submit"
+              disabled={uploading || missingFields.length > 0}
+              class="btn btn--primary"
+              style="width: 100%; justify-content: center; padding: 16px 24px; opacity: {uploading || missingFields.length > 0 ? 0.6 : 1}; cursor: {uploading || missingFields.length > 0 ? 'not-allowed' : 'pointer'};"
+            >
+              {#if uploading}
+                {statusMessage || 'Processing...'}
+              {:else}
+                Upload and List Dataset
+              {/if}
+            </button>
+            {#if !uploading && missingFields.length > 0}
+              <p style="font-family: var(--mono); font-size: 12px; color: var(--accent-deep); text-align: center; margin-top: 10px;">
+                Add {missingFields.join(', ')} to enable upload.
+              </p>
+            {/if}
           {/if}
 
           <!-- Note -->
