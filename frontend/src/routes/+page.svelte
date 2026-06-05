@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { queryMarketplaceEvents, MARKETPLACE_ID, formatAmount, coinSymbol } from '$lib/sui/config';
+  import { queryMarketplaceEvents, getListingFields, readCoinType, MARKETPLACE_ID, formatAmount, coinSymbol } from '$lib/sui/config';
   import { formatFileSize } from '$lib/walrus/client';
   import Mark from '$lib/components/Mark.svelte';
 
@@ -24,6 +24,10 @@
   let error: string | null = $state(null);
   let filterCategory = $state('all');
 
+  // Cap the grid at two rows (3 columns × 2) and paginate the rest.
+  const PAGE_SIZE = 6;
+  let currentPage = $state(0);
+
   const categories = [
     { value: 'all', label: 'All' },
     { value: 'language', label: 'Language' },
@@ -32,6 +36,13 @@
     { value: 'fine-tuning', label: 'Fine-Tuning' },
     { value: 'model-weights', label: 'Model Weights' },
   ];
+
+  // vector<u8> seal_policy_id arrives as base64 or number[]; non-empty = encrypted.
+  function sealPolicyNonEmpty(seal: unknown): boolean {
+    if (Array.isArray(seal)) return seal.length > 0;
+    if (typeof seal === 'string') return seal.length > 0;
+    return false;
+  }
 
   onMount(async () => {
     await loadDatasets();
@@ -47,27 +58,58 @@
       // client can't be used in-browser because Tatum's CORS rejects its headers.
       const events = await queryMarketplaceEvents(MARKETPLACE_ID, 'DatasetListed', 50);
 
-      const loadedDatasets: Dataset[] = [];
+      // Events only carry the listing's *creation* snapshot (purchase_count is
+      // always 0, no `active` flag). Read each listing's LIVE fields — the same
+      // source the detail page uses — so cards and the detail view never disagree
+      // on purchase count / status. Reads run in parallel; a failed read falls
+      // back to the event snapshot so the card still renders.
+      const settled = await Promise.all(
+        events.map(async (event: any): Promise<Dataset | null> => {
+          const parsed = (event.parsedJson || {}) as any;
+          const id = parsed.listing_id || '';
+          if (!id) return null;
 
-      for (const event of events) {
-        const parsed = (event.parsedJson || {}) as any;
-        loadedDatasets.push({
-          id: parsed.listing_id || '',
-          name: parsed.name || 'Unknown',
-          description: parsed.description || 'No description available',
-          category: parsed.category || 'other',
-          walrusBlobId: parsed.walrus_blob_id || '',
-          sizeBytes: parseInt(parsed.size_bytes) || 0,
-          price: parseInt(parsed.price) || 0,
-          coinType: parsed.coin_type || '0x2::sui::SUI',
-          encrypted: !!parsed.encrypted,
-          provider: parsed.provider || '',
-          active: true,
-          purchaseCount: 0,
-        });
-      }
+          const fallback: Dataset = {
+            id,
+            name: parsed.name || 'Unknown',
+            description: parsed.description || 'No description available',
+            category: parsed.category || 'other',
+            walrusBlobId: parsed.walrus_blob_id || '',
+            sizeBytes: parseInt(parsed.size_bytes) || 0,
+            price: parseInt(parsed.price) || 0,
+            coinType: readCoinType(parsed.coin_type),
+            encrypted: !!parsed.encrypted,
+            provider: parsed.provider || '',
+            active: true,
+            purchaseCount: 0,
+          };
 
-      datasets = loadedDatasets;
+          try {
+            const live = await getListingFields(MARKETPLACE_ID, id);
+            if (!live) return fallback;
+            const f = live.fields;
+            return {
+              id,
+              name: f.name ?? fallback.name,
+              description: f.description ?? fallback.description,
+              category: f.category ?? fallback.category,
+              walrusBlobId: f.walrus_blob_id ?? fallback.walrusBlobId,
+              sizeBytes: parseInt(f.size_bytes) || 0,
+              price: parseInt(f.price) || 0,
+              coinType: readCoinType(f.coin_type),
+              encrypted: sealPolicyNonEmpty(f.seal_policy_id),
+              provider: f.provider ?? fallback.provider,
+              active: f.active ?? true,
+              purchaseCount: parseInt(f.purchase_count) || 0,
+            };
+          } catch {
+            return fallback;
+          }
+        })
+      );
+
+      // "Available Datasets" = active listings only (hide delisted ones).
+      datasets = settled.filter((d): d is Dataset => d !== null && d.active);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load datasets';
       console.error('Error loading datasets:', err);
@@ -81,6 +123,20 @@
       ? datasets
       : datasets.filter((d) => d.category === filterCategory)
   );
+
+  let totalPages = $derived(Math.max(1, Math.ceil(filteredDatasets.length / PAGE_SIZE)));
+
+  // Clamp the page whenever the filtered set shrinks (e.g. after switching filter).
+  let safePage = $derived(Math.min(currentPage, totalPages - 1));
+
+  let pagedDatasets = $derived(
+    filteredDatasets.slice(safePage * PAGE_SIZE, safePage * PAGE_SIZE + PAGE_SIZE)
+  );
+
+  function selectFilter(value: string) {
+    filterCategory = value;
+    currentPage = 0;
+  }
 
   function truncateAddress(address: string): string {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
@@ -194,7 +250,7 @@
         {#each categories as cat}
           <button
             class="marketplace__filter {filterCategory === cat.value ? 'marketplace__filter--active' : ''}"
-            onclick={() => { filterCategory = cat.value; }}
+            onclick={() => selectFilter(cat.value)}
           >
             {cat.label}
           </button>
@@ -228,7 +284,7 @@
 
     {:else}
       <div class="marketplace__grid">
-        {#each filteredDatasets as dataset}
+        {#each pagedDatasets as dataset}
           <a href="/dataset/{dataset.id}" class="dataset-card">
             <div class="dataset-card__header">
               <span class="dataset-card__tag">{dataset.category}</span>
@@ -247,7 +303,7 @@
 
             <div class="dataset-card__footer">
               <span class="dataset-card__quality">
-                Quality: <span class="dataset-card__quality-val">0.94</span>
+                {dataset.encrypted ? '🔒 Encrypted' : '🔓 Open'}
               </span>
               <span class="dataset-card__price">
                 {formatAmount(dataset.price, dataset.coinType).split(' ')[0]}
@@ -257,6 +313,29 @@
           </a>
         {/each}
       </div>
+
+      {#if totalPages > 1}
+        <div class="marketplace__pagination">
+          <button
+            class="btn btn--ghost btn--sm"
+            onclick={() => { currentPage = Math.max(0, safePage - 1); }}
+            disabled={safePage === 0}
+          >
+            &larr; Prev
+          </button>
+          <span class="marketplace__page-info">
+            Page {safePage + 1} of {totalPages}
+            <span style="color: var(--faint);">&middot; {filteredDatasets.length} datasets</span>
+          </span>
+          <button
+            class="btn btn--ghost btn--sm"
+            onclick={() => { currentPage = Math.min(totalPages - 1, safePage + 1); }}
+            disabled={safePage >= totalPages - 1}
+          >
+            Next &rarr;
+          </button>
+        </div>
+      {/if}
     {/if}
   </div>
 </section>

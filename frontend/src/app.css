@@ -794,6 +794,21 @@ img { max-width: 100%; display: block; }
   gap: var(--sp-5);
 }
 
+/* Pagination — keeps the grid capped at two rows; reveals when >6 datasets. */
+.marketplace__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sp-5);
+  margin-top: var(--sp-6);
+}
+
+.marketplace__page-info {
+  font-family: var(--mono);
+  font-size: 12.5px;
+  color: var(--dim);
+}
+
 /* ---- Dataset Card ---- */
 .dataset-card {
   background: var(--card);
