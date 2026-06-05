@@ -224,7 +224,7 @@ cd ../mcp-server && npm install && npm run build && npm start
 | [Architecture](docs/Architecture.md) | System architecture, data flows, security model |
 | [API Reference](docs/API.md) | Smart contract API, Walrus API, MCP tools, Sui RPC |
 | [Deployment Guide](docs/Deployment.md) | Contract deployment, frontend deploy, MCP server setup |
-| [Demo & Verification Flow](docs/Demo-Verification-Flow.md) | Step-by-step guide to verify and demo all features |
+| [Testing Guide](docs/Testing-Guide.md) | End-to-end runbook: contracts → Walrus → Tatum → MCP → frontend → full flow |
 | [Blockers & Gaps](docs/Blockers.md) | Triaged open issues, verified state, and what's been fixed |
 
 ---

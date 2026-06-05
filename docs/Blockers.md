@@ -26,6 +26,8 @@
 
 ---
 
+> Full step-by-step test runbook for every layer: **[docs/Testing-Guide.md](./Testing-Guide.md)**.
+
 ## Verified state (independently re-run against the new deployment)
 
 | Area | Command | Result |
