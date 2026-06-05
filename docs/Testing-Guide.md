@@ -129,6 +129,8 @@ Sui RPC: Tatum gateway (https://sui-testnet.gateway.tatum.io) with public-fullno
 ### 4c. Drive each tool with the MCP Inspector  [manual]
 ```bash
 npx @modelcontextprotocol/inspector node mcp-server/dist/index.js
+# …or against the published package (no clone/build):
+# npx @modelcontextprotocol/inspector npx -y @olanuel/nexus-mcp-server
 ```
 Opens a local web UI. Under **Tools**, call each with these real inputs and confirm the result:
 

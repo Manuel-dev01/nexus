@@ -2,7 +2,8 @@
   import { uploadToWalrus, estimateUploadCost, formatCost, formatFileSize } from '$lib/walrus/client';
   import { buildListDatasetTransaction, PACKAGE_ID, MARKETPLACE_ID, explorerTx, TOKENS, SUI_COIN_TYPE, tokenByType } from '$lib/sui/config';
   import { detectWallets, connectWallet, signAndExecuteTransaction, type WalletInfo } from '$lib/wallet/store';
-  import { sealEncrypt, newSealIdentity } from '$lib/seal/client';
+  // Seal (@mysten/seal) is a heavy crypto lib loaded ON DEMAND via dynamic import
+  // below — importing it eagerly broke this route's hydration in the browser.
 
   let file: File | null = $state(null);
   let encrypt = $state(false);
@@ -62,6 +63,7 @@
       let sealPolicyId: number[] = [];
       if (encrypt) {
         statusMessage = 'Encrypting with Seal (key servers)...';
+        const { sealEncrypt, newSealIdentity } = await import('$lib/seal/client');
         const identity = newSealIdentity();
         sealPolicyId = identity.bytes;
         const plain = new Uint8Array(await file.arrayBuffer());

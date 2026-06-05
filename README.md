@@ -149,7 +149,13 @@ Nexus implements a **custom MCP server** that exposes domain-specific tools for 
 
 The Tatum `@tatumio/blockchain-mcp` server runs alongside for generic blockchain data (wallet balances, transaction history, etc.).
 
-> Full API reference: [docs/API.md](docs/API.md) · Wiring both MCP servers into an AI client: [docs/Deployment.md](docs/Deployment.md#4-configure-in-an-ai-client-two-server-composition).
+**📦 Published on npm** — run the Nexus MCP server with zero clone:
+```bash
+npx -y @olanuel/nexus-mcp-server
+```
+→ [`@olanuel/nexus-mcp-server`](https://www.npmjs.com/package/@olanuel/nexus-mcp-server) on npm.
+
+> Full API reference: [docs/API.md](docs/API.md) · Wiring both MCP servers into an AI client: [docs/Deployment.md](docs/Deployment.md#4-configure-in-an-ai-client-two-server-composition) · Publishing guide: [docs/Publishing-MCP.md](docs/Publishing-MCP.md).
 
 ---
 

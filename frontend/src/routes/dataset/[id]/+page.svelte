@@ -4,7 +4,7 @@
   import { getListingFields, formatAmount, coinSymbol, readCoinType, bytesFieldToHex, getAccessObjectForListing, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, hasPurchasedListing, explorerTx, explorerObject, explorerAccount } from '$lib/sui/config';
   import { downloadFromWalrus, verifyBlob, formatFileSize } from '$lib/walrus/client';
   import { detectWallets, connectWallet, signAndExecuteTransaction, signPersonalMessage, truncateAddress, type WalletInfo } from '$lib/wallet/store';
-  import { sealDecrypt } from '$lib/seal/client';
+  // Seal is loaded ON DEMAND (dynamic import below) — eager import broke hydration.
 
   interface Dataset {
     id: string;
@@ -184,6 +184,7 @@
         }
         const accessId = await getAccessObjectForListing(address, dataset.id);
         if (!accessId) throw new Error('No DatasetAccess object found to authorize decryption.');
+        const { sealDecrypt } = await import('$lib/seal/client');
         bytes = await sealDecrypt({
           ciphertext: bytes,
           identityHex: dataset.sealPolicyHex,

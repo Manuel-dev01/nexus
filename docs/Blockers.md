@@ -103,6 +103,6 @@ The Session 8d redeploy changed the package + marketplace addresses, so the earl
 
 ### 🔭 Stretch / out-of-MVP (CLAUDE.md §19)
 - [x] **MCP server signs `buy_dataset` itself** — opt-in `buy_dataset` tool (custodial key, `NEXUS_ENABLE_SIGNING`); signs via fullnode; dry-run verified (`DatasetPurchased` + `DatasetAccess`). Default-off/safe.
-- [x] **MCP server publish-ready for npm** — `bin`/shebang/`files`/`publishConfig` set; guide in [Publishing-MCP.md](./Publishing-MCP.md). *(Actual `npm publish` needs your npm login.)*
+- [x] **MCP server published to npm** — [`@olanuel/nexus-mcp-server@1.0.0`](https://www.npmjs.com/package/@olanuel/nexus-mcp-server); run anywhere via `npx -y @olanuel/nexus-mcp-server`. Guide: [Publishing-MCP.md](./Publishing-MCP.md).
 - [x] **Multi-token payments** — contract: `Coin<T>`-generic `list_dataset<T>`/`buy_dataset<T>`, listing stores `coin_type` (deployed `0x2797464…`, `buy_dataset<SUI>` dry-run success). Frontend: currency picker on upload, token-aware price/display, `coinType` threaded through buy. `check` 0/0 + builds. *(Registry ships SUI; add a token = one `TOKENS` entry.)*
 - [x] **Encrypted previews (Seal)** — contract: `seal_approve(id, &DatasetAccess)` + per-listing `seal_policy_id` + `encrypted` flag (deployed + 15/15 tests). Frontend: `@mysten/seal` encrypt-on-upload (toggle) + decrypt-on-download (wallet-signed `SessionKey` → `seal_approve` → key servers). Scaffolded, `check` 0/0 + builds. **⚠️ Needs a browser+wallet test pass** (live key-server round-trips can't be verified headless).

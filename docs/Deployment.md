@@ -110,14 +110,16 @@ node dist/index.js
 
 ### 4. Configure in an AI client (two-server composition)
 
-Nexus uses **two MCP servers side by side**: the custom **Nexus** server (domain tools) and Tatum's stock **`@tatumio/blockchain-mcp`** (generic chain data). Add both to your client's MCP config (e.g. Claude Desktop `claude_desktop_config.json`, Cursor, or any MCP client):
+Nexus uses **two MCP servers side by side**: the custom **Nexus** server (domain tools) and Tatum's stock **`@tatumio/blockchain-mcp`** (generic chain data). Add both to your client's MCP config (e.g. Claude Desktop `claude_desktop_config.json`, Cursor, or any MCP client).
+
+The Nexus server is published on npm as **[`@olanuel/nexus-mcp-server`](https://www.npmjs.com/package/@olanuel/nexus-mcp-server)**, so the simplest config runs it with `npx` — no clone or build needed:
 
 ```json
 {
   "mcpServers": {
     "nexus": {
-      "command": "node",
-      "args": ["/absolute/path/to/nexus/mcp-server/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@olanuel/nexus-mcp-server"],
       "env": {
         "TATUM_API_KEY": "<your-tatum-api-key>",
         "TATUM_RPC_URL": "https://sui-testnet.gateway.tatum.io",
@@ -134,6 +136,8 @@ Nexus uses **two MCP servers side by side**: the custom **Nexus** server (domain
   }
 }
 ```
+
+> *(To run a local build instead of the npm package, use `"command": "node", "args": ["/absolute/path/to/nexus/mcp-server/dist/index.js"]` with the same `env`.)*
 
 **Nexus server env vars** (reads all optional — hardcoded defaults exist; `TATUM_API_KEY` makes reads go through Tatum vs the public fullnode fallback): `TATUM_API_KEY`, `TATUM_RPC_URL`, `NEXUS_PACKAGE_ID`, `NEXUS_MARKETPLACE_ID`, `WALRUS_AGGREGATOR_URL`.
 

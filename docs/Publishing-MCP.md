@@ -1,9 +1,17 @@
 # Publishing the Nexus MCP Server to npm
 
+> ## ✅ Published
+> The Nexus MCP server is live on npm as **[`@olanuel/nexus-mcp-server@1.0.0`](https://www.npmjs.com/package/@olanuel/nexus-mcp-server)**.
+> Run it from anywhere — **no clone, no build:**
+> ```bash
+> npx -y @olanuel/nexus-mcp-server
+> ```
+> Wiring it into an AI client is in [§6 below](#6-tell-users-how-to-wire-it) (and [Deployment.md](./Deployment.md#4-configure-in-an-ai-client-two-server-composition)). The rest of this doc is the publish procedure for shipping updates.
+
 Publishing `mcp-server/` to npm lets anyone run the Nexus tools with **zero clone**:
-`npx -y nexus-mcp-server`. The package is already publish-ready — `dist/index.js` has a
+`npx -y @olanuel/nexus-mcp-server`. The package is already publish-ready — `dist/index.js` has a
 `#!/usr/bin/env node` shebang, `package.json` declares a `bin`, `files`, `publishConfig`,
-and a `prepublishOnly` that rebuilds. You just need an npm account and one command.
+and a `prepublishOnly` that rebuilds.
 
 > **Heads-up (irreversible-ish):** a published version is permanent — you can't re-publish the
 > same version number, and unpublish is only allowed within 72h (and discouraged). Do a dry run first.
@@ -65,7 +73,7 @@ simplifies to `npx` — no path needed:
   "mcpServers": {
     "nexus": {
       "command": "npx",
-      "args": ["-y", "nexus-mcp-server"],
+      "args": ["-y", "@olanuel/nexus-mcp-server"],
       "env": {
         "TATUM_API_KEY": "<your-tatum-api-key>",
         "NEXUS_PACKAGE_ID": "0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7",

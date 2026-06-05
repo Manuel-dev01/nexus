@@ -1,5 +1,5 @@
 {
-  "name": "nexus-mcp-server",
+  "name": "@olanuel/nexus-mcp-server",
   "version": "1.0.0",
   "description": "Nexus AI Agent MCP Server — domain-specific tools for a decentralized AI dataset marketplace on Sui + Walrus",
   "type": "module",
