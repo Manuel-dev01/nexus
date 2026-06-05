@@ -80,12 +80,15 @@ vercel --prod
 5. **Deployment Protection** → Disable "Vercel Authentication"
 
 **Environment Variables (set in Vercel Dashboard):**
-| Name | Value |
-|------|-------|
-| `PUBLIC_NEXUS_PACKAGE_ID` | `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6` |
-| `PUBLIC_NEXUS_MARKETPLACE_ID` | `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99` |
+| Name | Value | Required? |
+|------|-------|-----------|
+| `PUBLIC_NEXUS_PACKAGE_ID` | `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6` | recommended |
+| `PUBLIC_NEXUS_MARKETPLACE_ID` | `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99` | recommended |
+| `PUBLIC_TATUM_API_KEY` | your Tatum API key | optional |
 
-Note: Contract addresses are also hardcoded in `frontend/src/lib/sui/config.ts` as fallbacks.
+Notes:
+- Contract addresses are also hardcoded in `frontend/src/lib/sui/config.ts` as fallbacks, so the first two are optional for the app to load.
+- **`PUBLIC_TATUM_API_KEY`**: if set, the frontend routes its read RPC through the Tatum gateway; if unset, it automatically falls back to the public Sui fullnode (the app works either way). The frontend uses a plain `fetch` for RPC — **not** the `@mysten/sui` SDK client — because the SDK adds a `client-sdk-version` request header that the Tatum gateway's CORS policy blocks in the browser.
 
 ## MCP Server Deployment
 

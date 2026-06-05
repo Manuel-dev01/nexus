@@ -1,7 +1,7 @@
 <script lang="ts">
   import { page } from '$app/state';
   import { onMount } from 'svelte';
-  import { getSuiClient, formatSui, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, mistToSui, hasPurchasedListing } from '$lib/sui/config';
+  import { getObject, formatSui, PACKAGE_ID, MARKETPLACE_ID, buildBuyDatasetTransaction, mistToSui, hasPurchasedListing } from '$lib/sui/config';
   import { downloadFromWalrus, verifyBlob, formatFileSize } from '$lib/walrus/client';
   import { detectWallets, connectWallet, signAndExecuteTransaction, truncateAddress, type WalletInfo } from '$lib/wallet/store';
 
@@ -52,15 +52,7 @@
     }
 
     try {
-      const client = getSuiClient();
-
-      const result = await client.getObject({
-        id,
-        options: {
-          showContent: true,
-          showOwner: true,
-        },
-      });
+      const result = await getObject(id, { showContent: true, showOwner: true });
 
       if (!result.data?.content || result.data.content.dataType !== 'moveObject') {
         throw new Error('Dataset not found');

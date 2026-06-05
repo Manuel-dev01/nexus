@@ -101,9 +101,18 @@ export async function signAndExecuteTransaction(
     throw new Error(`Wallet ${wallet.name} does not support signAndExecuteTransaction`);
   }
 
+  // The Wallet-Standard feature REQUIRES the signing account — the adapter reads
+  // `account.address` internally, so passing `undefined` throws
+  // "Cannot read properties of undefined (reading 'address')". After connect, the
+  // wallet exposes the authorized accounts on the adapter.
+  const account = (wallet.adapter as any).accounts?.[0];
+  if (!account) {
+    throw new Error('No connected account — please connect your wallet first.');
+  }
+
   const result = await signFeature.signAndExecuteTransaction({
     transaction: tx,
-    account: undefined,
+    account,
     chain: 'sui:testnet',
   });
 

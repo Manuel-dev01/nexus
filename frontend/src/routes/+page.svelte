@@ -40,8 +40,9 @@
     error = null;
 
     try {
-      // Discover listings via DatasetListed events, routed through the
-      // Tatum gateway (getSuiClient) for consistency with the rest of the app.
+      // Discover listings via DatasetListed events. queryMarketplaceEvents uses
+      // a raw-fetch RPC (Tatum-preferred, public-fullnode fallback) — the SDK
+      // client can't be used in-browser because Tatum's CORS rejects its headers.
       const events = await queryMarketplaceEvents(MARKETPLACE_ID, 'DatasetListed', 50);
 
       const loadedDatasets: Dataset[] = [];

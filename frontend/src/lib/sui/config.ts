@@ -24,41 +24,55 @@ export const PACKAGE_ID = import.meta.env.PUBLIC_NEXUS_PACKAGE_ID
 export const MARKETPLACE_ID = import.meta.env.PUBLIC_NEXUS_MARKETPLACE_ID
   || '0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99';
 
-// === SuiClient Initialization ===
+// === Browser-safe RPC ===
 
 /**
- * Create a SuiJsonRpcClient configured to use Tatum's RPC gateway.
- * All Sui RPC calls will be routed through Tatum.
- *
- * @returns SuiJsonRpcClient instance
+ * Public Sui fullnode — CORS-open and key-less. Used as a fallback (and when no
+ * Tatum key is configured) for browser reads.
  */
-export function createSuiClient(): SuiJsonRpcClient {
-  const transport = new JsonRpcHTTPTransport({
-    url: TATUM_RPC_URL,
-    rpc: {
-      headers: {
-        'x-api-key': TATUM_API_KEY
-      }
-    }
-  });
+export const SUI_FULLNODE_URL = 'https://fullnode.testnet.sui.io:443';
 
-  return new SuiJsonRpcClient({
-    transport,
-    network: NETWORK as 'testnet' | 'mainnet' | 'devnet',
+/**
+ * Raw JSON-RPC call. The frontend deliberately does NOT use the @mysten/sui
+ * SuiClient for reads: the SDK adds a `client-sdk-version` request header that
+ * the Tatum gateway's CORS allowlist rejects, so SDK-over-Tatum fails the
+ * browser preflight. A plain fetch sends no such header. Tatum is preferred
+ * when an API key is present; otherwise (and on any Tatum error) we fall back to
+ * the public fullnode so the app keeps working even if PUBLIC_TATUM_API_KEY is
+ * unset in the host. Server-side code (MCP server, scripts) still uses Tatum.
+ */
+export async function rpc(method: string, params: any[]): Promise<any> {
+  const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method, params });
+
+  if (TATUM_API_KEY) {
+    try {
+      const res = await fetch(TATUM_RPC_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': TATUM_API_KEY },
+        body,
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (!data.error) return data.result;
+      }
+    } catch {
+      // fall through to the public fullnode
+    }
+  }
+
+  const res = await fetch(SUI_FULLNODE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body,
   });
+  const data = await res.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.result;
 }
 
-/**
- * Get a singleton SuiJsonRpcClient instance.
- * Reuses the same client across the application.
- */
-let clientInstance: SuiJsonRpcClient | null = null;
-
-export function getSuiClient(): SuiJsonRpcClient {
-  if (!clientInstance) {
-    clientInstance = createSuiClient();
-  }
-  return clientInstance;
+/** Fetch an object; mirrors the shape of SuiClient.getObject's response. */
+export async function getObject(id: string, options: Record<string, boolean>) {
+  return rpc('sui_getObject', [id, options]);
 }
 
 // === PTB Builders for Marketplace Operations ===
@@ -185,14 +199,7 @@ export function buildDelistDatasetTransaction(params: {
  * @returns Promise with marketplace stats
  */
 export async function getMarketplaceStats(marketplaceId: string) {
-  const client = getSuiClient();
-
-  const result = await client.getObject({
-    id: marketplaceId,
-    options: {
-      showContent: true,
-    },
-  });
+  const result = await getObject(marketplaceId, { showContent: true });
 
   if (!result.data?.content || result.data.content.dataType !== 'moveObject') {
     throw new Error('Failed to fetch marketplace data');
@@ -218,15 +225,7 @@ export async function getMarketplaceStats(marketplaceId: string) {
  * @returns Promise with listing details
  */
 export async function getListingDetails(marketplaceId: string, listingId: string) {
-  const client = getSuiClient();
-
-  const result = await client.getObject({
-    id: listingId,
-    options: {
-      showContent: true,
-      showOwner: true,
-    },
-  });
+  const result = await getObject(listingId, { showContent: true, showOwner: true });
 
   if (!result.data?.content || result.data.content.dataType !== 'moveObject') {
     throw new Error('Failed to fetch listing data');
@@ -258,15 +257,8 @@ export async function getListingDetails(marketplaceId: string, listingId: string
  * @returns Promise with array of listing IDs
  */
 export async function getActiveListings(marketplaceId: string): Promise<string[]> {
-  const client = getSuiClient();
-
   // Get marketplace object to access listings table
-  const marketplace = await client.getObject({
-    id: marketplaceId,
-    options: {
-      showContent: true,
-    },
-  });
+  const marketplace = await getObject(marketplaceId, { showContent: true });
 
   if (!marketplace.data?.content || marketplace.data.content.dataType !== 'moveObject') {
     throw new Error('Failed to fetch marketplace data');
@@ -276,9 +268,7 @@ export async function getActiveListings(marketplaceId: string): Promise<string[]
   const listingsTableId = fields.listings.fields.id.id;
 
   // Query dynamic fields of the listings table
-  const dynamicFields = await client.getDynamicFields({
-    parentId: listingsTableId,
-  });
+  const dynamicFields = await rpc('suix_getDynamicFields', [listingsTableId, null, null]);
 
   // Filter for active listings
   const activeListings: string[] = [];
@@ -302,16 +292,12 @@ export async function getActiveListings(marketplaceId: string): Promise<string[]
  * @returns Promise with array of access object IDs
  */
 export async function getUserAccessObjects(address: string): Promise<string[]> {
-  const client = getSuiClient();
+  const objects = await rpc('suix_getOwnedObjects', [
+    address,
+    { filter: { StructType: `${PACKAGE_ID}::nexus_marketplace::DatasetAccess` } },
+  ]);
 
-  const objects = await client.getOwnedObjects({
-    owner: address,
-    filter: {
-      StructType: `${PACKAGE_ID}::nexus_marketplace::DatasetAccess`,
-    },
-  });
-
-  return objects.data.map(obj => obj.data?.objectId || '').filter(Boolean);
+  return (objects.data || []).map((obj: any) => obj.data?.objectId || '').filter(Boolean);
 }
 
 /**
@@ -323,18 +309,16 @@ export async function getUserAccessObjects(address: string): Promise<string[]> {
  * @returns Promise<boolean> - true if the address holds access to the listing
  */
 export async function hasPurchasedListing(address: string, listingId: string): Promise<boolean> {
-  const client = getSuiClient();
-
-  const objects = await client.getOwnedObjects({
-    owner: address,
-    filter: {
-      StructType: `${PACKAGE_ID}::nexus_marketplace::DatasetAccess`,
+  const objects = await rpc('suix_getOwnedObjects', [
+    address,
+    {
+      filter: { StructType: `${PACKAGE_ID}::nexus_marketplace::DatasetAccess` },
+      options: { showContent: true },
     },
-    options: { showContent: true },
-  });
+  ]);
 
-  return objects.data.some((obj) => {
-    const content = obj.data?.content as { dataType?: string; fields?: { listing_id?: string } } | undefined;
+  return (objects.data || []).some((obj: any) => {
+    const content = obj.data?.content;
     return content?.dataType === 'moveObject' && content.fields?.listing_id === listingId;
   });
 }
@@ -346,16 +330,12 @@ export async function hasPurchasedListing(address: string, listingId: string): P
  * @returns Promise with array of capability object IDs
  */
 export async function getUserProviderCaps(address: string): Promise<string[]> {
-  const client = getSuiClient();
+  const objects = await rpc('suix_getOwnedObjects', [
+    address,
+    { filter: { StructType: `${PACKAGE_ID}::nexus_marketplace::ProviderCap` } },
+  ]);
 
-  const objects = await client.getOwnedObjects({
-    owner: address,
-    filter: {
-      StructType: `${PACKAGE_ID}::nexus_marketplace::ProviderCap`,
-    },
-  });
-
-  return objects.data.map(obj => obj.data?.objectId || '').filter(Boolean);
+  return (objects.data || []).map((obj: any) => obj.data?.objectId || '').filter(Boolean);
 }
 
 // === Event Queries ===
@@ -373,20 +353,14 @@ export async function queryMarketplaceEvents(
   eventType: 'DatasetListed' | 'DatasetPurchased' | 'DatasetDelisted',
   limit: number = 50
 ) {
-  const client = getSuiClient();
-
-  const events = await client.queryEvents({
-    query: {
-      MoveModule: {
-        package: PACKAGE_ID,
-        module: 'nexus_marketplace',
-      },
-    },
+  const events = await rpc('suix_queryEvents', [
+    { MoveModule: { package: PACKAGE_ID, module: 'nexus_marketplace' } },
+    null,
     limit,
-    order: 'descending',
-  });
+    true, // descending
+  ]);
 
-  return events.data.filter(event => event.type.includes(eventType));
+  return (events.data || []).filter((event: any) => event.type.includes(eventType));
 }
 
 // === Utility Functions ===
