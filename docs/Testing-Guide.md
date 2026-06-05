@@ -23,8 +23,8 @@ cd ../mcp-server && npm install
 
 | Thing | Value |
 |------|-------|
-| Package | `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6` |
-| Marketplace (shared) | `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99` |
+| Package | `0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7` |
+| Marketplace (shared) | `0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430` |
 | Provider/seed wallet | `0x14c6ce9f17daec0d358b01becc22aeff722123634cddb88d911b8c40f98c37cb` |
 | Tatum RPC | `https://sui-testnet.gateway.tatum.io` |
 | Walrus publisher / aggregator | `…publisher.walrus-testnet.walrus.space` / `…aggregator.walrus-testnet.walrus.space` |
@@ -33,9 +33,9 @@ cd ../mcp-server && npm install
 
 | Name | Price | Listing ID | Walrus blob |
 |------|-------|-----------|-------------|
-| GPT-2 Embedding Vectors | 0.5 SUI | `0x6ed1d7bc7b1a50cbb72ffaf7403c9ddcf1a535d2dceaee3bb0a946dd7fb1e72a` | `BBCZfBAb6FI8zHOHa7ztwPBUHvcIJd3X9TARW7RVX8w` |
-| Fine-Tuning Dataset | 0.25 SUI | `0x6c533a9971197f8f05b9b7da8c48f77c5626093175d74ca0f11ef7e1bd7832f7` | `aGir1MudixR_2MezEKRfKHzqwXkBzD1xd9iaFhamZQ0` |
-| LoRA Adapter Weights | 1.0 SUI | `0x074c78d3d50fb475d887a6d006cce7b1e107f11d51f0a462ff29f53b307c474d` | `Zkw-aZCSW8EMuZHmXh_fq-J3qlVnQcPEj9t9M46WOeQ` |
+| GPT-2 Embedding Vectors | 0.5 SUI | `0x94d1bd84b3f89294d8cf0e6439fb224e980d514ad6d3e8cf6d69de5b564c2e89` | `njQKp7aFXHLNd6PzKGcZYQEt9-UU2m3a9nASmIC8OU8` |
+| Fine-Tuning Dataset | 0.25 SUI | `0x21e212efa54d5dfc3c144dfdfe0a41f4b9dfdddf6c75402a859726bac8645a0a` | `aGir1MudixR_2MezEKRfKHzqwXkBzD1xd9iaFhamZQ0` |
+| LoRA Adapter Weights | 1.0 SUI | `0x61362a6818ecc49bc65d94bc7e189fb9559e77b41a10c3aff697746175a13f69` | `rusSEWN3gYhFC-FZicd9KU1BCXt-HIvT9gF1Yc-tIQo` |
 
 > Listing IDs change whenever you re-seed. To get a fresh one, run `search_nexus_datasets` (§4) or copy it from a dataset page URL.
 
@@ -132,13 +132,16 @@ Opens a local web UI. Under **Tools**, call each with these real inputs and conf
 | Tool | Example input | Expect |
 |------|---------------|--------|
 | `search_nexus_datasets` | `{ "category": "embeddings" }` | ≥1 dataset incl. GPT-2; grab a `listingId` from the result |
-| `get_dataset_details` | `{ "listingId": "0x6ed1d7bc7b1a50cbb72ffaf7403c9ddcf1a535d2dceaee3bb0a946dd7fb1e72a" }` | full metadata (name, description, price, `walrusBlobId`, `downloadUrl`) — **not** "Listing not found" |
-| `check_dataset_purchase` | `{ "address": "0x000…000", "listingId": "0x6ed1d7bc…" }` | `{ "hasPurchased": false, "canDownload": false, … }` |
-| `get_walrus_blob` | `{ "blobId": "BBCZfBAb6FI8zHOHa7ztwPBUHvcIJd3X9TARW7RVX8w" }` | size + sha256 + base64 of the blob |
+| `get_dataset_details` | `{ "listingId": "0x94d1bd84b3f89294d8cf0e6439fb224e980d514ad6d3e8cf6d69de5b564c2e89" }` | full metadata (name, description, price, `walrusBlobId`, `downloadUrl`) — **not** "Listing not found" |
+| `check_dataset_purchase` | `{ "address": "0x000…000", "listingId": "0x94d1bd84…" }` | `{ "hasPurchased": false, "canDownload": false, … }` |
+| `get_walrus_blob` | `{ "blobId": "njQKp7aFXHLNd6PzKGcZYQEt9-UU2m3a9nASmIC8OU8" }` | size + sha256 + base64 of the blob |
 | `get_marketplace_stats` | `{}` | totalListings / totalSales / treasury / `platformFeePercent: 2` |
-| `verify_dataset_integrity` | `{ "blobId": "BBCZfBAb…", "expectedHash": "1d5cf96b74632de77440c9d29459793c88f09a700171a5c9cf54b97e5aeb94e1" }` | `status: "VERIFIED"` |
+| `verify_dataset_integrity` | `{ "blobId": "njQKp7aF…", "expectedHash": "f242c9eac879a715ae7c91185bbddd7ce8f74be2f4b40a769c2c61cc073097ba" }` | `status: "VERIFIED"` |
+| `buy_dataset` *(opt-in)* | `{ "listingId": "0x94d1bd84…" }` | with signing **off**: instructions to enable; with `NEXUS_ENABLE_SIGNING=true`+`SUI_PRIVATE_KEY`: `signed:true`, a tx `digest` + minted `accessId` |
 
 Under **Resources**, open `marketplace://overview` → JSON marketplace snapshot.
+
+> To test `buy_dataset` for real, restart the Inspector command with `NEXUS_ENABLE_SIGNING=true` and `SUI_PRIVATE_KEY=<a dedicated low-balance testnet key>` in the env. It executes an actual purchase (mints a `DatasetAccess`) — use a throwaway key.
 
 - [ ] `test-mcp.ts` → 9 passed
 - [ ] Server boots and logs the Tatum endpoint

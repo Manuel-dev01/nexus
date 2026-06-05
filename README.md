@@ -72,16 +72,16 @@ Nexus flips this model:
 
 | Contract | Object ID (click to verify on Suiscan) |
 |----------|-----------|
-| Package | [`0xb291fda4…de804c6`](https://suiscan.xyz/testnet/object/0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6) |
-| Marketplace | [`0x1cbd4543…3652bd99`](https://suiscan.xyz/testnet/object/0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99) |
+| Package | [`0xb291fda4…de804c6`](https://suiscan.xyz/testnet/object/0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7) |
+| Marketplace | [`0x1cbd4543…3652bd99`](https://suiscan.xyz/testnet/object/0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430) |
 
 **Seeded Datasets:**
 
 | Dataset | Category | Price | Walrus Blob ID |
 |---------|----------|-------|----------------|
-| GPT-2 Embedding Vectors | embeddings | 0.5 SUI | `BBCZfBAb6FI8zHOHa7ztwPBUHvcIJd3X9TARW7RVX8w` |
+| GPT-2 Embedding Vectors | embeddings | 0.5 SUI | `njQKp7aFXHLNd6PzKGcZYQEt9-UU2m3a9nASmIC8OU8` |
 | Fine-Tuning Dataset | fine-tuning | 0.25 SUI | `aGir1MudixR_2MezEKRfKHzqwXkBzD1xd9iaFhamZQ0` |
-| LoRA Adapter Weights | model-weights | 1.0 SUI | `Zkw-aZCSW8EMuZHmXh_fq-J3qlVnQcPEj9t9M46WOeQ` |
+| LoRA Adapter Weights | model-weights | 1.0 SUI | `rusSEWN3gYhFC-FZicd9KU1BCXt-HIvT9gF1Yc-tIQo` |
 
 ---
 
@@ -138,6 +138,7 @@ Nexus implements a **custom MCP server** that exposes domain-specific tools for 
 | `get_walrus_blob` | Download raw dataset from Walrus | Walrus Aggregator |
 | `get_marketplace_stats` | Get marketplace overview | Tatum `sui_getObject` |
 | `verify_dataset_integrity` | Verify blob hash matches expected | Walrus Aggregator |
+| `buy_dataset` *(opt-in)* | Agent signs & submits the purchase itself (custodial key) | Sui fullnode signing |
 
 The Tatum `@tatumio/blockchain-mcp` server runs alongside for generic blockchain data (wallet balances, transaction history, etc.).
 

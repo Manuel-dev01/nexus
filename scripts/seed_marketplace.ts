@@ -248,8 +248,10 @@ async function listDatasetOnSui(
   console.log(`   Listing on Sui marketplace...`);
 
   const tx = new Transaction();
+  // Seed datasets are SUI-priced and unencrypted (empty seal_policy_id).
   tx.moveCall({
     target: `${PACKAGE_ID}::nexus_marketplace::list_dataset`,
+    typeArguments: ["0x2::sui::SUI"],
     arguments: [
       tx.object(MARKETPLACE_ID),
       tx.pure.string(dataset.name),
@@ -260,6 +262,7 @@ async function listDatasetOnSui(
       tx.pure.u64(dataset.price),
       tx.pure.option("string", contentHash),
       tx.pure.option("u64", null),
+      tx.pure.vector("u8", []), // seal_policy_id ([] = not encrypted)
       tx.object("0x6"), // Sui system Clock
     ],
   });

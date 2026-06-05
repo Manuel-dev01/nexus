@@ -57,7 +57,7 @@
 ## Phase 4 — Seed, Polish, Record (Day 6: June 5-6)
 
 - [x] Write `seed_marketplace.ts` (3 real datasets) — repaired in Session 8, verified via on-chain dry-run
-- [x] Deploy Move contracts to Sui Testnet — redeployed Session 8 (package `0xb291…`, marketplace `0x1cbd…`) after the B-4/B-5 contract fixes; re-seeded with 3 datasets
+- [x] Deploy Move contracts to Sui Testnet — redeployed Session 8 (package `0x2797…`, marketplace `0xac47…`) after the B-4/B-5 contract fixes; re-seeded with 3 datasets
 - [x] Deploy frontend to Vercel (⚠️ pending dashboard: disable auth + set env vars)
 - [x] Polish UI animations and error states
 - [ ] Record 2-3 min demo video per §17
@@ -69,6 +69,6 @@
 - [x] Independent E2E verification of all suites
 - [x] MCP server reads routed through Tatum; `get_dataset_details` fixed (dynamic field); +`check_dataset_purchase` (8h)
 - [x] Frontend: TS errors fixed; raw-`fetch` `rpc()` (Tatum + fullnode fallback, dodges SDK/CORS); dynamic-field listing reads; wallet account fix; download gating; Suiscan links
-- [x] Contract: `buy_dataset` refund fix + double-buy prevention; **redeployed** clean (package `0xb291…`, marketplace `0x1cbd…`); 12 Move tests; re-seeded
+- [x] Contract: `buy_dataset` refund fix + double-buy prevention; **redeployed** clean (package `0x2797…`, marketplace `0xac47…`); 12 Move tests; re-seeded
 - [x] All docs reconciled to current reality (8h); `docs/Blockers.md` is the status SoT
 - [ ] **Open (user):** B-2 re-set Vercel env to new addresses + redeploy frontend; B-3 verify demo video; submit — see `docs/Blockers.md`

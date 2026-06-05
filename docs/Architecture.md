@@ -41,7 +41,7 @@ Nexus is a decentralized AI model and memory marketplace built on Sui. Data prov
 
 ### 1. Smart Contracts (Sui Move)
 
-**Package:** `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6`
+**Package:** `0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7`
 
 **Modules:**
 - `nexus_marketplace` — Core marketplace logic, including the `DatasetListed` / `DatasetPurchased` / `DatasetDelisted` events emitted for indexing
@@ -114,6 +114,7 @@ Nexus is a decentralized AI model and memory marketplace built on Sui. Data prov
 | `get_walrus_blob` | Download blob from Walrus |
 | `get_marketplace_stats` | Marketplace overview |
 | `verify_dataset_integrity` | Check blob hash |
+| `buy_dataset` *(opt-in)* | Server signs & submits the purchase with a custodial key |
 
 The stock `@tatumio/blockchain-mcp` server is composed alongside it (see [Deployment.md](./Deployment.md#4-configure-in-an-ai-client-two-server-composition)).
 
@@ -182,25 +183,31 @@ AI Agent → MCP Server (stdio)
   → search_nexus_datasets (query DatasetListed events)
   → get_dataset_details (read listing via dynamic field)
   → check_dataset_purchase (skip if already owned)
-  → [wallet signs buy_dataset PTB]
+  → buy_dataset (opt-in: server signs the PTB)  — OR a wallet signs it
   → get_walrus_blob (download data)
   → verify_dataset_integrity (check hash)
 ```
+
+> `buy_dataset` is **opt-in/custodial**: only active when the server is started with
+> `NEXUS_ENABLE_SIGNING=true` + `SUI_PRIVATE_KEY` (a dedicated low-balance testnet key). It signs
+> via the public fullnode (the SDK needs `suix_getLatestSuiSystemState` to build a tx, which the
+> Tatum gateway doesn't expose); all reads still route through Tatum. Default-off so a published
+> server is read-only and safe.
 
 ## Contract Deployment
 
 **Network:** Sui Testnet (chain ID: `4c78adac`)
 
 **Deployed Objects:**
-- Package: `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6`
-- Marketplace: `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99`
+- Package: `0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7`
+- Marketplace: `0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430`
 
 **Existing Listings:**
 | Name | Category | Price | Blob ID |
 |------|----------|-------|---------|
-| LoRA-Weights | model-weights | 1 SUI | `Zkw-aZCSW8EMuZHmXh_fq-J3qlVnQcPEj9t9M46WOeQ` |
+| LoRA-Weights | model-weights | 1 SUI | `rusSEWN3gYhFC-FZicd9KU1BCXt-HIvT9gF1Yc-tIQo` |
 | FineTuning-Dataset | fine-tuning | 0.25 SUI | `aGir1MudixR_2MezEKRfKHzqwXkBzD1xd9iaFhamZQ0` |
-| GPT2-Embeddings | embeddings | 0.5 SUI | `BBCZfBAb6FI8zHOHa7ztwPBUHvcIJd3X9TARW7RVX8w` |
+| GPT2-Embeddings | embeddings | 0.5 SUI | `njQKp7aFXHLNd6PzKGcZYQEt9-UU2m3a9nASmIC8OU8` |
 
 ## Security Considerations
 

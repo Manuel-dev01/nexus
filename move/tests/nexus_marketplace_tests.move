@@ -46,11 +46,16 @@ module nexus::nexus_marketplace_tests {
         clock
     }
 
-    /// List a default dataset (as PROVIDER) and return its listing ID.
+    /// List a default SUI-priced dataset (as PROVIDER) and return its listing ID.
     fun list_default(scenario: &mut Scenario, clock: &Clock): ID {
+        list_with_seal(scenario, clock, b"")
+    }
+
+    /// List a default dataset with a given Seal policy id (b"" = not encrypted).
+    fun list_with_seal(scenario: &mut Scenario, clock: &Clock, seal_policy_id: vector<u8>): ID {
         next_tx(scenario, PROVIDER);
         let mut marketplace = test_scenario::take_shared<Marketplace>(scenario);
-        let listing_id = nexus_marketplace::list_dataset(
+        let listing_id = nexus_marketplace::list_dataset<SUI>(
             &mut marketplace,
             string::utf8(b"Test Dataset"),
             string::utf8(b"A test dataset"),
@@ -60,6 +65,7 @@ module nexus::nexus_marketplace_tests {
             PRICE,
             option::some(string::utf8(b"sha256:abc")),
             option::some(1u64),
+            seal_policy_id,
             clock,
             ctx(scenario),
         );
@@ -136,7 +142,7 @@ module nexus::nexus_marketplace_tests {
         {
             let mut marketplace = test_scenario::take_shared<Marketplace>(&scenario);
             let high_price = 1_000_000_000_000; // 1000 SUI
-            let listing_id = nexus_marketplace::list_dataset(
+            let listing_id = nexus_marketplace::list_dataset<SUI>(
                 &mut marketplace,
                 string::utf8(b"Expensive Dataset"),
                 string::utf8(b"A very expensive dataset"),
@@ -146,6 +152,7 @@ module nexus::nexus_marketplace_tests {
                 high_price,
                 option::none(),
                 option::some(100u64),
+                b"",
                 &clock,
                 ctx(&mut scenario),
             );
@@ -170,16 +177,24 @@ module nexus::nexus_marketplace_tests {
         {
             let mut marketplace = test_scenario::take_shared<Marketplace>(&scenario);
             let payment = coin::mint_for_testing<SUI>(PRICE, ctx(&mut scenario));
-            nexus_marketplace::buy_dataset(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario));
+            nexus_marketplace::buy_dataset<SUI>(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario));
 
             let (_, total_sales, total_volume, treasury) =
                 nexus_marketplace::get_marketplace_stats(&marketplace);
             assert_eq(total_sales, 1);
             assert_eq(total_volume, PRICE);
-            assert_eq(treasury, expected_fee(PRICE)); // only the fee, nothing more
+            assert_eq(treasury, 0); // fees are paid out to admin, not pooled
             assert_eq(nexus_marketplace::has_purchased(&marketplace, listing_id, BUYER), true);
             assert_eq(nexus_marketplace::has_purchased(&marketplace, listing_id, BUYER2), false);
             test_scenario::return_shared(marketplace);
+        };
+
+        // Admin received the 2% platform fee.
+        next_tx(&mut scenario, ADMIN);
+        {
+            let fee = test_scenario::take_from_sender<Coin<SUI>>(&scenario);
+            assert_eq(coin::value(&fee), expected_fee(PRICE));
+            test_scenario::return_to_sender(&scenario, fee);
         };
 
         // Buyer now owns a DatasetAccess bound to the listing.
@@ -220,12 +235,20 @@ module nexus::nexus_marketplace_tests {
         {
             let mut marketplace = test_scenario::take_shared<Marketplace>(&scenario);
             let payment = coin::mint_for_testing<SUI>(overpay, ctx(&mut scenario));
-            nexus_marketplace::buy_dataset(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario));
+            nexus_marketplace::buy_dataset<SUI>(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario));
 
             let (_, _, total_volume, treasury) = nexus_marketplace::get_marketplace_stats(&marketplace);
-            assert_eq(treasury, expected_fee(PRICE)); // NOT drained, NOT inflated by the overpayment
+            assert_eq(treasury, 0); // pooled treasury unused; fee paid to admin
             assert_eq(total_volume, PRICE);
             test_scenario::return_shared(marketplace);
+        };
+
+        // Admin received exactly the fee on `price` (not on the overpayment).
+        next_tx(&mut scenario, ADMIN);
+        {
+            let fee = test_scenario::take_from_sender<Coin<SUI>>(&scenario);
+            assert_eq(coin::value(&fee), expected_fee(PRICE));
+            test_scenario::return_to_sender(&scenario, fee);
         };
 
         // Buyer was refunded exactly the overpayment.
@@ -282,7 +305,7 @@ module nexus::nexus_marketplace_tests {
         {
             let mut marketplace = test_scenario::take_shared<Marketplace>(&scenario);
             let payment = coin::mint_for_testing<SUI>(PRICE, ctx(&mut scenario));
-            nexus_marketplace::buy_dataset(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario));
+            nexus_marketplace::buy_dataset<SUI>(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario));
             test_scenario::return_shared(marketplace);
         };
 
@@ -323,7 +346,7 @@ module nexus::nexus_marketplace_tests {
         next_tx(&mut scenario, PROVIDER);
         {
             let mut marketplace = test_scenario::take_shared<Marketplace>(&scenario);
-            let _id = nexus_marketplace::list_dataset(
+            let _id = nexus_marketplace::list_dataset<SUI>(
                 &mut marketplace,
                 string::utf8(b"Zero"),
                 string::utf8(b"zero price"),
@@ -333,6 +356,7 @@ module nexus::nexus_marketplace_tests {
                 0, // invalid → EInvalidPrice
                 option::none(),
                 option::none(),
+                b"",
                 &clock,
                 ctx(&mut scenario),
             );
@@ -354,7 +378,7 @@ module nexus::nexus_marketplace_tests {
         {
             let mut marketplace = test_scenario::take_shared<Marketplace>(&scenario);
             let payment = coin::mint_for_testing<SUI>(PRICE - 1, ctx(&mut scenario)); // too little
-            nexus_marketplace::buy_dataset(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario));
+            nexus_marketplace::buy_dataset<SUI>(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario));
             test_scenario::return_shared(marketplace);
         };
 
@@ -374,7 +398,7 @@ module nexus::nexus_marketplace_tests {
         {
             let mut marketplace = test_scenario::take_shared<Marketplace>(&scenario);
             let payment = coin::mint_for_testing<SUI>(PRICE, ctx(&mut scenario));
-            nexus_marketplace::buy_dataset(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario));
+            nexus_marketplace::buy_dataset<SUI>(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario));
             test_scenario::return_shared(marketplace);
         };
 
@@ -382,7 +406,7 @@ module nexus::nexus_marketplace_tests {
         {
             let mut marketplace = test_scenario::take_shared<Marketplace>(&scenario);
             let payment = coin::mint_for_testing<SUI>(PRICE, ctx(&mut scenario));
-            nexus_marketplace::buy_dataset(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario)); // aborts
+            nexus_marketplace::buy_dataset<SUI>(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario)); // aborts
             test_scenario::return_shared(marketplace);
         };
 
@@ -412,7 +436,7 @@ module nexus::nexus_marketplace_tests {
         {
             let mut marketplace = test_scenario::take_shared<Marketplace>(&scenario);
             let payment = coin::mint_for_testing<SUI>(PRICE, ctx(&mut scenario));
-            nexus_marketplace::buy_dataset(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario)); // aborts
+            nexus_marketplace::buy_dataset<SUI>(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario)); // aborts
             test_scenario::return_shared(marketplace);
         };
 
@@ -452,5 +476,84 @@ module nexus::nexus_marketplace_tests {
 
     fun transfer_cap_to(cap: ProviderCap, recipient: address) {
         sui::transfer::public_transfer(cap, recipient);
+    }
+
+    // === Multi-token + Seal tests ===
+
+    /// A stand-in non-SUI coin type, to prove payment-token enforcement.
+    public struct FAKE has drop {}
+
+    #[test]
+    #[expected_failure(abort_code = nexus::nexus_marketplace::EWrongPaymentToken)]
+    fun test_buy_with_wrong_token_fails() {
+        let mut scenario = setup();
+        let clock = create_test_clock(&mut scenario);
+        let listing_id = list_default(&mut scenario, &clock); // priced in SUI
+
+        next_tx(&mut scenario, BUYER);
+        {
+            let mut marketplace = test_scenario::take_shared<Marketplace>(&scenario);
+            let payment = coin::mint_for_testing<FAKE>(PRICE, ctx(&mut scenario)); // wrong token
+            nexus_marketplace::buy_dataset<FAKE>(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario)); // aborts
+            test_scenario::return_shared(marketplace);
+        };
+
+        clock::destroy_for_testing(clock);
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    fun test_seal_policy_propagates_and_approves() {
+        let mut scenario = setup();
+        let clock = create_test_clock(&mut scenario);
+        let policy = b"seal-policy-xyz";
+        let listing_id = list_with_seal(&mut scenario, &clock, policy);
+
+        // Buy the encrypted dataset.
+        next_tx(&mut scenario, BUYER);
+        {
+            let mut marketplace = test_scenario::take_shared<Marketplace>(&scenario);
+            let payment = coin::mint_for_testing<SUI>(PRICE, ctx(&mut scenario));
+            nexus_marketplace::buy_dataset<SUI>(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario));
+            test_scenario::return_shared(marketplace);
+        };
+
+        // The access carries the policy, and seal_approve accepts the match.
+        next_tx(&mut scenario, BUYER);
+        {
+            let access = test_scenario::take_from_sender<DatasetAccess>(&scenario);
+            assert_eq(nexus_marketplace::get_access_seal_policy(&access), policy);
+            nexus_marketplace::call_seal_approve(policy, &access); // must not abort
+            test_scenario::return_to_sender(&scenario, access);
+        };
+
+        clock::destroy_for_testing(clock);
+        test_scenario::end(scenario);
+    }
+
+    #[test]
+    #[expected_failure(abort_code = nexus::nexus_marketplace::ENoAccess)]
+    fun test_seal_approve_rejects_wrong_identity() {
+        let mut scenario = setup();
+        let clock = create_test_clock(&mut scenario);
+        let listing_id = list_with_seal(&mut scenario, &clock, b"the-real-policy");
+
+        next_tx(&mut scenario, BUYER);
+        {
+            let mut marketplace = test_scenario::take_shared<Marketplace>(&scenario);
+            let payment = coin::mint_for_testing<SUI>(PRICE, ctx(&mut scenario));
+            nexus_marketplace::buy_dataset<SUI>(&mut marketplace, listing_id, payment, &clock, ctx(&mut scenario));
+            test_scenario::return_shared(marketplace);
+        };
+
+        next_tx(&mut scenario, BUYER);
+        {
+            let access = test_scenario::take_from_sender<DatasetAccess>(&scenario);
+            nexus_marketplace::call_seal_approve(b"a-different-policy", &access); // aborts ENoAccess
+            test_scenario::return_to_sender(&scenario, access);
+        };
+
+        clock::destroy_for_testing(clock);
+        test_scenario::end(scenario);
     }
 }

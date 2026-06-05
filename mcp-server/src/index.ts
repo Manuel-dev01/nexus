@@ -1,3 +1,4 @@
+#!/usr/bin/env node
 /**
  * Nexus MCP Server — AI Agent Tool Definitions
  *
@@ -8,6 +9,7 @@
  * - get_marketplace_stats: Marketplace overview
  * - verify_dataset_integrity: Check blob hash
  * - check_dataset_purchase: Whether an address already owns access to a listing
+ * - buy_dataset: (opt-in) Server-signs the purchase PTB with a custodial key
  *
  * All Sui reads are routed through Tatum's RPC gateway.
  * Implements Model Context Protocol (MCP) for LLM integration.
@@ -17,15 +19,28 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { createHash } from 'crypto';
+import { Ed25519Keypair } from '@mysten/sui/keypairs/ed25519';
+import { Transaction } from '@mysten/sui/transactions';
+import { SuiJsonRpcClient, JsonRpcHTTPTransport } from '@mysten/sui/jsonRpc';
 
 // === Configuration ===
 
 const TATUM_RPC_URL = process.env.TATUM_RPC_URL || 'https://sui-testnet.gateway.tatum.io';
 const TATUM_API_KEY = process.env.TATUM_API_KEY || '';
 const SUI_RPC_URL = 'https://fullnode.testnet.sui.io:443';
-const PACKAGE_ID = process.env.NEXUS_PACKAGE_ID || '0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6';
-const MARKETPLACE_ID = process.env.NEXUS_MARKETPLACE_ID || '0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99';
+const PACKAGE_ID = process.env.NEXUS_PACKAGE_ID || '0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7';
+const MARKETPLACE_ID = process.env.NEXUS_MARKETPLACE_ID || '0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430';
 const WALRUS_AGGREGATOR_URL = process.env.WALRUS_AGGREGATOR_URL || 'https://aggregator.walrus-testnet.walrus.space';
+
+// === Optional server-side signing (custodial; opt-in) ===
+// Disabled unless BOTH a key is provided AND NEXUS_ENABLE_SIGNING=true. This lets
+// the agent itself sign `buy_dataset` instead of handing a payload to a wallet.
+// SECURITY: the key can spend the wallet's funds — use a dedicated, low-balance
+// TESTNET key only. Tx building needs `suix_getLatestSuiSystemState` (gas price),
+// which the Tatum gateway does not expose, so signing executes via the public
+// fullnode; all *reads* still go through Tatum.
+const SUI_PRIVATE_KEY = process.env.SUI_PRIVATE_KEY || '';
+const SIGNING_ENABLED = process.env.NEXUS_ENABLE_SIGNING === 'true' && !!SUI_PRIVATE_KEY;
 
 // === Types ===
 
@@ -178,6 +193,47 @@ async function ownsDatasetAccess(address: string, listingId: string): Promise<bo
     const content = obj.data?.content;
     return content?.dataType === 'moveObject' && content.fields?.listing_id === listingId;
   });
+}
+
+/**
+ * Build, sign, and submit a `buy_dataset` PTB with the custodial key. Executes
+ * via the public fullnode (the SDK needs `suix_getLatestSuiSystemState` to build,
+ * which Tatum's gateway doesn't expose). Returns the digest + minted access id.
+ */
+async function executeBuy(listingId: string): Promise<{ digest: string; priceMist: number; accessId?: string }> {
+  const keypair = Ed25519Keypair.fromSecretKey(SUI_PRIVATE_KEY);
+  const client = new SuiJsonRpcClient({
+    transport: new JsonRpcHTTPTransport({ url: SUI_RPC_URL }),
+    network: 'testnet',
+  });
+
+  const fields = await getListingFields(listingId);
+  if (!fields) throw new Error('Listing not found');
+  if (fields.active === false) throw new Error('Listing is not active');
+  const priceMist = parseInt(fields.price);
+
+  const tx = new Transaction();
+  // Server-side purchases pay in native SUI split from the custodial gas coin.
+  const [coin] = tx.splitCoins(tx.gas, [priceMist]);
+  tx.moveCall({
+    target: `${PACKAGE_ID}::nexus_marketplace::buy_dataset`,
+    typeArguments: ['0x2::sui::SUI'],
+    arguments: [tx.object(MARKETPLACE_ID), tx.pure.id(listingId), coin, tx.object('0x6')],
+  });
+  tx.setGasBudget(100_000_000);
+
+  const res = await client.signAndExecuteTransaction({
+    signer: keypair,
+    transaction: tx,
+    options: { showEffects: true, showObjectChanges: true },
+  });
+  if (res.effects?.status?.status !== 'success') {
+    throw new Error(`Transaction failed: ${JSON.stringify(res.effects?.status)}`);
+  }
+  const access = (res.objectChanges || []).find(
+    (c: any) => typeof c.objectType === 'string' && c.objectType.includes('::nexus_marketplace::DatasetAccess'),
+  ) as any;
+  return { digest: res.digest, priceMist, accessId: access?.objectId };
 }
 
 // === MCP Server Setup ===
@@ -491,6 +547,75 @@ server.tool(
   }
 );
 
+/**
+ * Autonomously purchase a dataset — the server signs the buy_dataset PTB itself.
+ * OPT-IN (custodial): requires NEXUS_ENABLE_SIGNING=true + SUI_PRIVATE_KEY.
+ */
+server.tool(
+  'buy_dataset',
+  'Autonomously purchase a Nexus dataset: the server signs and submits the on-chain buy_dataset transaction with its custodial key, mints a DatasetAccess, and returns the transaction digest. OPT-IN — requires the server to be started with NEXUS_ENABLE_SIGNING=true and a SUI_PRIVATE_KEY. Without it, use the wallet purchase flow instead.',
+  {
+    listingId: z.string().describe('The dataset listing object ID to purchase')
+  },
+  async ({ listingId }) => {
+    if (!SIGNING_ENABLED) {
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            signed: false,
+            reason: 'Server-side signing is disabled on this server.',
+            howToEnable: 'Start the MCP server with NEXUS_ENABLE_SIGNING=true and SUI_PRIVATE_KEY set to a dedicated, low-balance TESTNET key.',
+            alternative: 'Hand this listingId to a wallet to sign buy_dataset (the frontend purchase flow).'
+          }, null, 2)
+        }],
+        isError: true
+      };
+    }
+    try {
+      const buyer = Ed25519Keypair.fromSecretKey(SUI_PRIVATE_KEY).toSuiAddress();
+
+      // Avoid the on-chain EAlreadyPurchased abort.
+      if (await ownsDatasetAccess(buyer, listingId)) {
+        return {
+          content: [{
+            type: 'text',
+            text: JSON.stringify({
+              signed: false,
+              buyer,
+              listingId,
+              note: 'This wallet already owns access to this dataset — skipping to avoid EAlreadyPurchased. Use get_walrus_blob to download it.'
+            }, null, 2)
+          }]
+        };
+      }
+
+      const { digest, priceMist, accessId } = await executeBuy(listingId);
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            signed: true,
+            buyer,
+            listingId,
+            priceMist,
+            price: formatSui(priceMist),
+            digest,
+            accessId,
+            explorer: `https://suiscan.xyz/testnet/tx/${digest}`,
+            note: 'Purchase complete — DatasetAccess minted. Use get_walrus_blob to download and verify_dataset_integrity to confirm.'
+          }, null, 2)
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{ type: 'text', text: `Error buying dataset: ${error}` }],
+        isError: true
+      };
+    }
+  }
+);
+
 // === Resource Definitions ===
 
 server.resource(
@@ -545,6 +670,11 @@ async function main() {
     : `public fullnode only (no TATUM_API_KEY set) — ${SUI_RPC_URL}`;
   console.error('Nexus MCP Server started');
   console.error(`Sui RPC: ${rpcMode}`);
+  console.error(
+    SIGNING_ENABLED
+      ? 'Server-side signing: ENABLED (buy_dataset will sign with the custodial key)'
+      : 'Server-side signing: disabled (buy_dataset returns instructions; set NEXUS_ENABLE_SIGNING=true + SUI_PRIVATE_KEY to enable)'
+  );
 }
 
 main().catch(console.error);

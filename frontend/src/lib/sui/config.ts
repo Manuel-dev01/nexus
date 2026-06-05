@@ -19,10 +19,10 @@ export const NETWORK = import.meta.env.PUBLIC_SUI_NETWORK || 'testnet';
 // === Package IDs (deployed contract addresses) ===
 
 export const PACKAGE_ID = import.meta.env.PUBLIC_NEXUS_PACKAGE_ID
-  || '0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6';
+  || '0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7';
 
 export const MARKETPLACE_ID = import.meta.env.PUBLIC_NEXUS_MARKETPLACE_ID
-  || '0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99';
+  || '0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430';
 
 // === Explorer (Suiscan) link builders ===
 // Sui Explorer is deprecated and redirects to Suiscan, so link there directly.
@@ -138,6 +138,9 @@ export async function getListingFields(
  * @param params - Listing parameters
  * @returns Transaction object ready to be signed and executed
  */
+/** Full Sui coin type a listing is priced in. Defaults to native SUI. */
+export const SUI_COIN_TYPE = '0x2::sui::SUI';
+
 export function buildListDatasetTransaction(params: {
   marketplaceId: string;
   name: string;
@@ -148,6 +151,10 @@ export function buildListDatasetTransaction(params: {
   price: number;
   contentHash?: string;
   storageEpochs?: number;
+  /** Coin type the dataset is priced in (full type, e.g. "0x2::sui::SUI"). */
+  coinType?: string;
+  /** Seal encryption identity bytes ([] = not encrypted). */
+  sealPolicyId?: number[];
   clockId: string;
 }): Transaction {
   const tx = new Transaction();
@@ -167,9 +174,10 @@ export function buildListDatasetTransaction(params: {
     ? tx.pure.option('u64', params.storageEpochs)
     : tx.pure.option('u64', null);
 
-  // Call list_dataset function
+  // Call list_dataset<T> — generic over the priced coin type.
   tx.moveCall({
     target: `${PACKAGE_ID}::nexus_marketplace::list_dataset`,
+    typeArguments: [params.coinType ?? SUI_COIN_TYPE],
     arguments: [
       tx.object(params.marketplaceId),
       tx.pure.string(params.name),
@@ -180,6 +188,7 @@ export function buildListDatasetTransaction(params: {
       tx.pure.u64(params.price),
       contentHashArg,
       storageEpochsArg,
+      tx.pure.vector('u8', params.sealPolicyId ?? []),
       tx.object(params.clockId),
     ],
   });
@@ -197,17 +206,27 @@ export function buildBuyDatasetTransaction(params: {
   marketplaceId: string;
   listingId: string;
   paymentAmount: number;
+  /** Coin type to pay in — must match the listing. Defaults to SUI (split from gas). */
+  coinType?: string;
+  /** For non-SUI tokens, the coin object id to pay from. */
+  paymentCoinId?: string;
   clockId: string;
 }): Transaction {
   const tx = new Transaction();
 
-  // Pay by splitting the exact price out of the wallet's gas coin. The contract
-  // refunds any rounding remainder from the buyer's own coin, so exact is safe.
-  const [paymentCoin] = tx.splitCoins(tx.gas, [params.paymentAmount]);
+  const coinType = params.coinType ?? SUI_COIN_TYPE;
 
-  // Call buy_dataset function
+  // SUI is split from the gas coin; other tokens are split from a provided coin.
+  // The contract refunds any rounding remainder from the buyer's own coin.
+  const source = coinType === SUI_COIN_TYPE
+    ? tx.gas
+    : tx.object(params.paymentCoinId!);
+  const [paymentCoin] = tx.splitCoins(source, [params.paymentAmount]);
+
+  // Call buy_dataset<T>
   tx.moveCall({
     target: `${PACKAGE_ID}::nexus_marketplace::buy_dataset`,
+    typeArguments: [coinType],
     arguments: [
       tx.object(params.marketplaceId),
       tx.pure.id(params.listingId),

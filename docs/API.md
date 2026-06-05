@@ -4,7 +4,7 @@
 
 ### Package
 ```
-0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6
+0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7
 ```
 
 ### Module: `nexus_marketplace`
@@ -233,6 +233,20 @@ Verify blob integrity.
 |-----------|------|----------|-------------|
 | `blobId` | `string` | Yes | Walrus blob ID |
 | `expectedHash` | `string` | Yes | Expected SHA256 |
+
+---
+
+### `buy_dataset`  *(opt-in, custodial signing)*
+Autonomously purchase a dataset — the **server signs and submits** the `buy_dataset` transaction with a custodial key, mints a `DatasetAccess`, and returns the digest. Pre-checks `check_dataset_purchase` to avoid the `EAlreadyPurchased` abort. Signs via the public fullnode (reads still go through Tatum).
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `listingId` | `string` | Yes | Listing object ID to purchase |
+
+**Returns:** `{ signed, buyer, listingId, priceMist, digest, accessId, explorer }` on success; if signing is disabled, returns instructions instead.
+
+**Enable it:** start the server with `NEXUS_ENABLE_SIGNING=true` and `SUI_PRIVATE_KEY=<dedicated low-balance TESTNET key>`. ⚠️ The key can spend funds — use a throwaway testnet key only. Disabled by default; without it, the wallet purchase flow is used instead.
 
 ---
 

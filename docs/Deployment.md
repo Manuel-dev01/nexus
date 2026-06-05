@@ -82,8 +82,8 @@ vercel --prod
 **Environment Variables (set in Vercel Dashboard):**
 | Name | Value | Required? |
 |------|-------|-----------|
-| `PUBLIC_NEXUS_PACKAGE_ID` | `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6` | required if any were set pre-redeploy |
-| `PUBLIC_NEXUS_MARKETPLACE_ID` | `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99` | required if any were set pre-redeploy |
+| `PUBLIC_NEXUS_PACKAGE_ID` | `0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7` | required if any were set pre-redeploy |
+| `PUBLIC_NEXUS_MARKETPLACE_ID` | `0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430` | required if any were set pre-redeploy |
 | `PUBLIC_TATUM_API_KEY` | your Tatum API key | optional (enables frontend→Tatum) |
 
 Notes:
@@ -121,8 +121,8 @@ Nexus uses **two MCP servers side by side**: the custom **Nexus** server (domain
       "env": {
         "TATUM_API_KEY": "<your-tatum-api-key>",
         "TATUM_RPC_URL": "https://sui-testnet.gateway.tatum.io",
-        "NEXUS_PACKAGE_ID": "0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6",
-        "NEXUS_MARKETPLACE_ID": "0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99",
+        "NEXUS_PACKAGE_ID": "0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7",
+        "NEXUS_MARKETPLACE_ID": "0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430",
         "WALRUS_AGGREGATOR_URL": "https://aggregator.walrus-testnet.walrus.space"
       }
     },
@@ -135,11 +135,13 @@ Nexus uses **two MCP servers side by side**: the custom **Nexus** server (domain
 }
 ```
 
-**Nexus server env vars** (all optional — hardcoded defaults exist; `TATUM_API_KEY` makes reads go through Tatum vs the public fullnode fallback): `TATUM_API_KEY`, `TATUM_RPC_URL`, `NEXUS_PACKAGE_ID`, `NEXUS_MARKETPLACE_ID`, `WALRUS_AGGREGATOR_URL`.
+**Nexus server env vars** (reads all optional — hardcoded defaults exist; `TATUM_API_KEY` makes reads go through Tatum vs the public fullnode fallback): `TATUM_API_KEY`, `TATUM_RPC_URL`, `NEXUS_PACKAGE_ID`, `NEXUS_MARKETPLACE_ID`, `WALRUS_AGGREGATOR_URL`.
 
-**Nexus tools exposed:** `search_nexus_datasets`, `get_dataset_details`, `check_dataset_purchase`, `get_walrus_blob`, `get_marketplace_stats`, `verify_dataset_integrity` (+ the `marketplace://overview` resource).
+**Opt-in autonomous purchasing** (off by default): set `NEXUS_ENABLE_SIGNING=true` **and** `SUI_PRIVATE_KEY=<dedicated low-balance TESTNET key>` to let the `buy_dataset` tool sign and submit the purchase itself. ⚠️ The key can spend funds — use a throwaway testnet key. Leave both unset for a read-only, safe deployment.
 
-**Agent flow:** the LLM calls `search_nexus_datasets` → `get_dataset_details` → optionally `check_dataset_purchase` → presents the listing + price (a wallet signs the actual `buy_dataset` PTB) → `get_walrus_blob` to ingest the data.
+**Nexus tools exposed:** `search_nexus_datasets`, `get_dataset_details`, `check_dataset_purchase`, `get_walrus_blob`, `get_marketplace_stats`, `verify_dataset_integrity`, `buy_dataset` *(opt-in)* (+ the `marketplace://overview` resource).
+
+**Agent flow:** the LLM calls `search_nexus_datasets` → `get_dataset_details` → `check_dataset_purchase` → **`buy_dataset`** (if signing is enabled the server signs it; otherwise a wallet signs the PTB) → `get_walrus_blob` to ingest the data.
 
 ## Testnet Deployment Status
 
@@ -147,8 +149,8 @@ Nexus uses **two MCP servers side by side**: the custom **Nexus** server (domain
 
 | Component | ID/URL |
 |-----------|--------|
-| Package | `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6` |
-| Marketplace | `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99` |
+| Package | `0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7` |
+| Marketplace | `0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430` |
 | Chain ID | `4c78adac` (testnet) |
 | Sui RPC | `https://sui-testnet.gateway.tatum.io` |
 | Walrus Publisher | `https://publisher.walrus-testnet.walrus.space` |

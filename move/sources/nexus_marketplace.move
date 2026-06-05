@@ -26,6 +26,7 @@ module nexus::nexus_marketplace {
     use std::string::{Self, String};
     use std::option::{Self, Option};
     use std::vector;
+    use std::type_name::{Self, TypeName};
 
     // === Errors ===
 
@@ -38,6 +39,10 @@ module nexus::nexus_marketplace {
     const EEmptyName: u64 = 7;
     const EEmptyDescription: u64 = 8;
     const EEmptyWalrusBlobId: u64 = 9;
+    /// Payment coin type does not match the listing's priced token
+    const EWrongPaymentToken: u64 = 11;
+    /// Seal: the caller's DatasetAccess does not match the requested identity
+    const ENoAccess: u64 = 12;
 
     // === Constants ===
 
@@ -83,8 +88,12 @@ module nexus::nexus_marketplace {
         walrus_blob_id: String,
         /// Size of the dataset in bytes
         size_bytes: u64,
-        /// Price in MIST
+        /// Price (in the smallest unit of `coin_type`)
         price: u64,
+        /// The coin type this listing is priced in (e.g. SUI, USDC)
+        coin_type: TypeName,
+        /// Seal encryption identity for this dataset (empty = not encrypted)
+        seal_policy_id: vector<u8>,
         /// Address of the data provider
         provider: address,
         /// Whether the listing is active
@@ -115,6 +124,8 @@ module nexus::nexus_marketplace {
         purchased_at: u64,
         /// Optional: Content hash for verification
         content_hash: Option<String>,
+        /// Seal encryption identity (copied from the listing) — gates decryption
+        seal_policy_id: vector<u8>,
     }
 
     /// Owned object: Capability that proves ownership of a listing
@@ -135,6 +146,10 @@ module nexus::nexus_marketplace {
         walrus_blob_id: String,
         size_bytes: u64,
         price: u64,
+        /// Coin type the listing is priced in, as a string (e.g. "…::sui::SUI")
+        coin_type: String,
+        /// Whether the dataset is Seal-encrypted (seal_policy_id non-empty)
+        encrypted: bool,
         provider: address,
         timestamp: u64,
     }
@@ -194,7 +209,9 @@ module nexus::nexus_marketplace {
     /// - storage_epochs: Optional number of Walrus storage epochs
     /// - clock: The Sui clock object for timestamps
     /// - ctx: Transaction context
-    public fun list_dataset(
+    /// `T` is the coin type the dataset is priced in (e.g. `SUI`, a USDC type).
+    /// `seal_policy_id` is the Seal encryption identity (empty = not encrypted).
+    public fun list_dataset<T>(
         marketplace: &mut Marketplace,
         name: String,
         description: String,
@@ -204,6 +221,7 @@ module nexus::nexus_marketplace {
         price: u64,
         content_hash: Option<String>,
         storage_epochs: Option<u64>,
+        seal_policy_id: vector<u8>,
         clock: &Clock,
         ctx: &mut TxContext,
     ): ID {
@@ -216,6 +234,8 @@ module nexus::nexus_marketplace {
 
         let provider = tx_context::sender(ctx);
         let timestamp = sui::clock::timestamp_ms(clock);
+        let coin_type = type_name::get<T>();
+        let encrypted = vector::length(&seal_policy_id) > 0;
 
         // Create the listing
         let listing = DatasetListing {
@@ -226,6 +246,8 @@ module nexus::nexus_marketplace {
             walrus_blob_id,
             size_bytes,
             price,
+            coin_type,
+            seal_policy_id,
             provider,
             active: true,
             listed_at: timestamp,
@@ -253,6 +275,8 @@ module nexus::nexus_marketplace {
             name,
             category,
             walrus_blob_id,
+            coin_type: string::from_ascii(type_name::into_string(coin_type)),
+            encrypted,
             size_bytes,
             price,
             provider,
@@ -275,10 +299,11 @@ module nexus::nexus_marketplace {
     /// - payment: Coin<SUI> payment (must be >= price)
     /// - clock: The Sui clock object for timestamps
     /// - ctx: Transaction context
-    public fun buy_dataset(
+    /// `T` must match the listing's `coin_type` (the token it's priced in).
+    public fun buy_dataset<T>(
         marketplace: &mut Marketplace,
         listing_id: ID,
-        payment: Coin<SUI>,
+        payment: Coin<T>,
         clock: &Clock,
         ctx: &mut TxContext,
     ) {
@@ -287,9 +312,13 @@ module nexus::nexus_marketplace {
 
         let buyer = tx_context::sender(ctx);
         let fee_bps = marketplace.fee_bps;
+        let admin = marketplace.admin;
 
         let listing = table::borrow_mut(&mut marketplace.listings, listing_id);
         assert!(listing.active, EListingNotActive);
+
+        // Payment must be in the token the listing is priced in.
+        assert!(type_name::get<T>() == listing.coin_type, EWrongPaymentToken);
 
         // A buyer cannot purchase the same dataset twice.
         assert!(!table::contains(&listing.purchasers, buyer), EAlreadyPurchased);
@@ -298,26 +327,24 @@ module nexus::nexus_marketplace {
         let price = listing.price;
         assert!(payment_amount >= price, EInsufficientPayment);
 
-        // Calculate fees
         let platform_fee = (price * fee_bps) / BASIS_POINTS_DENOMINATOR;
         let provider_payout = price - platform_fee;
 
-        // Take exactly `price` out of the payment; whatever remains is the buyer's change.
+        // Take exactly `price` out of the payment; the rest is the buyer's change.
         let mut payment_balance = coin::into_balance(payment);
         let mut sale_balance = balance::split(&mut payment_balance, price);
 
-        // Platform fee → treasury
+        // Platform fee → admin. (Generic Coin<T> can't pool in a Balance<SUI>
+        // treasury, so the fee is paid out directly rather than accumulated.)
         let fee_balance = balance::split(&mut sale_balance, platform_fee);
-        balance::join(&mut marketplace.treasury, fee_balance);
+        transfer::public_transfer(coin::from_balance(fee_balance, ctx), admin);
 
-        // Remaining sale amount (price - fee) → provider
-        let provider_coin = coin::from_balance(sale_balance, ctx);
-        transfer::public_transfer(provider_coin, listing.provider);
+        // Remaining sale amount (price - fee) → provider.
+        transfer::public_transfer(coin::from_balance(sale_balance, ctx), listing.provider);
 
-        // Refund any overpayment from the BUYER'S OWN coin — never from the treasury.
+        // Refund any overpayment from the BUYER'S OWN coin.
         if (balance::value(&payment_balance) > 0) {
-            let refund_coin = coin::from_balance(payment_balance, ctx);
-            transfer::public_transfer(refund_coin, buyer);
+            transfer::public_transfer(coin::from_balance(payment_balance, ctx), buyer);
         } else {
             balance::destroy_zero(payment_balance);
         };
@@ -329,6 +356,7 @@ module nexus::nexus_marketplace {
         let timestamp = sui::clock::timestamp_ms(clock);
         let walrus_blob_id = listing.walrus_blob_id;
         let content_hash = listing.content_hash;
+        let seal_policy_id = listing.seal_policy_id;
 
         // Update marketplace stats
         marketplace.total_sales = marketplace.total_sales + 1;
@@ -342,6 +370,7 @@ module nexus::nexus_marketplace {
             owner: buyer,
             purchased_at: timestamp,
             content_hash,
+            seal_policy_id,
         };
 
         // Emit event
@@ -356,6 +385,15 @@ module nexus::nexus_marketplace {
 
         // Transfer access to buyer
         transfer::transfer(access, buyer);
+    }
+
+    /// Seal access policy. The Seal key servers call this read-only (dry-run) to
+    /// decide whether to release the decryption key for identity `id`. Aborts
+    /// unless the caller-supplied `DatasetAccess` was issued for exactly that
+    /// identity (its `seal_policy_id` matches `id`). Side-effect free.
+    entry fun seal_approve(id: vector<u8>, access: &DatasetAccess) {
+        assert!(vector::length(&access.seal_policy_id) > 0, ENoAccess);
+        assert!(access.seal_policy_id == id, ENoAccess);
     }
 
     /// Delist a dataset (only provider can do this)
@@ -471,6 +509,18 @@ module nexus::nexus_marketplace {
             access.owner,
             access.purchased_at,
         )
+    }
+
+    /// The Seal encryption identity carried by a DatasetAccess (empty if the
+    /// dataset is not encrypted).
+    public fun get_access_seal_policy(access: &DatasetAccess): vector<u8> {
+        access.seal_policy_id
+    }
+
+    #[test_only]
+    /// Test wrapper so the test module can exercise the entry-only `seal_approve`.
+    public fun call_seal_approve(id: vector<u8>, access: &DatasetAccess) {
+        seal_approve(id, access);
     }
 
     /// Get provider capability details

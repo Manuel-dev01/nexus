@@ -13,8 +13,8 @@
  */
 
 const SUI_RPC = 'https://fullnode.testnet.sui.io:443';
-const PACKAGE_ID = '0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6';
-const MARKETPLACE_ID = '0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99';
+const PACKAGE_ID = '0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7';
+const MARKETPLACE_ID = '0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430';
 const WALRUS_AGGREGATOR = 'https://aggregator.walrus-testnet.walrus.space';
 
 interface TestResult {

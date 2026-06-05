@@ -10,19 +10,19 @@
 
 | Object | ID |
 |--------|----|
-| Package | `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6` |
-| Marketplace (shared) | `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99` |
-| UpgradeCap | `0x1e83efd34871a1965df1de5908ac335aa0d0c4dfe77352de8ede4987f20a21f6` |
+| Package | `0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7` |
+| Marketplace (shared) | `0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430` |
+| UpgradeCap | `0x88f150e0aecb13a61800d0a1c554a45fd7681b614053079b520a194540ddb02f` |
 
-> **Dead packages (do not use):** `0xd4121a45…` (original) and `0x86208eab…` (the B-4/B-5 fix deploy, which still carried the `nexus_events` module). Both are superseded by `0xb291fda4…`, whose bytecode now exactly matches the cleaned source (single `nexus_marketplace` module).
+> **Dead packages (do not use):** `0xd4121a45…` (original), `0x86208eab…` (B-4/B-5 fix, still carried `nexus_events`), and `0xb291fda4…` (single-module clean redeploy, SUI-only). All superseded by **`0x2797464…`** — the current package, which is generic over the payment coin type (`Coin<T>`, multi-token) and adds Seal access control (`seal_approve` + `seal_policy_id`).
 
 **Seeded datasets (new blob IDs):**
 
 | Dataset | Category | Price | Walrus Blob ID |
 |---------|----------|-------|----------------|
-| GPT-2 Embedding Vectors | embeddings | 0.5 SUI | `BBCZfBAb6FI8zHOHa7ztwPBUHvcIJd3X9TARW7RVX8w` |
+| GPT-2 Embedding Vectors | embeddings | 0.5 SUI | `njQKp7aFXHLNd6PzKGcZYQEt9-UU2m3a9nASmIC8OU8` |
 | Fine-Tuning Dataset | fine-tuning | 0.25 SUI | `aGir1MudixR_2MezEKRfKHzqwXkBzD1xd9iaFhamZQ0` |
-| LoRA Adapter Weights | model-weights | 1.0 SUI | `Zkw-aZCSW8EMuZHmXh_fq-J3qlVnQcPEj9t9M46WOeQ` |
+| LoRA Adapter Weights | model-weights | 1.0 SUI | `rusSEWN3gYhFC-FZicd9KU1BCXt-HIvT9gF1Yc-tIQo` |
 
 ---
 
@@ -36,7 +36,7 @@
 | Frontend typecheck | `npm run check` | **0 errors, 0 warnings** |
 | Frontend build | `npx vite build` | pass |
 | Contract E2E | `scripts/test-contracts.ts` | 11 pass / 6 skip — 3 listings on new pkg |
-| MCP tools (6) | `scripts/test-mcp.ts` | **9 pass / 1 skip** — incl. dynamic-field `get_dataset_details` + `check_dataset_purchase` |
+| MCP tools (7) | `scripts/test-mcp.ts` | **9 pass / 1 skip** (6 read tools); `buy_dataset` is opt-in/custodial, dry-run verified |
 | Walrus round-trip | `scripts/walrus-spike.ts` | upload + download + Tatum checkpoint pass |
 | Scripts typecheck | `scripts` `tsc --noEmit` | pass |
 | MCP build | `mcp-server` `tsc` | pass |
@@ -51,8 +51,8 @@ The Session 8d redeploy changed the package + marketplace addresses, so the earl
 
 - **B-1 · Vercel Authentication** — deployment-independent; stays disabled. ✅
 - **B-2 · Vercel env vars** — ⚠️ **RE-SET REQUIRED** (they point at the dead `0x86208eab…`). Update in the dashboard, then redeploy the frontend:
-  - `PUBLIC_NEXUS_PACKAGE_ID=0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6`
-  - `PUBLIC_NEXUS_MARKETPLACE_ID=0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99`
+  - `PUBLIC_NEXUS_PACKAGE_ID=0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7`
+  - `PUBLIC_NEXUS_MARKETPLACE_ID=0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430`
 - **B-3 · Demo video** — ⚠️ **VERIFY**: the app UI is unchanged (same dataset names/prices), so a recording of the *flow* is still valid. Re-record only if your video shows a specific on-chain address, object, or Walrus blob ID (those changed).
 
 ---
@@ -83,24 +83,26 @@ The Session 8d redeploy changed the package + marketplace addresses, so the earl
 
 ## ✅ "What's left" — consolidated checklist
 
-**Everything in code/contracts/docs is done.** The only open items are user dashboard actions + submission.
+**All contracts + backend + infra are done and verified.** Remaining work is the **frontend UI for the two stretch features** (the on-chain primitives are already deployed) plus user dashboard actions + submission.
 
 ### Done ✅
-- [x] **Contracts** — deployed `0xb291fda4…`; `buy_dataset` refund fix + double-buy prevention; `has_purchased` view; single `nexus_marketplace` module; **12/12 Move tests**; 3 datasets seeded.
-- [x] **Frontend** — marketplace/detail load (raw-`fetch` `rpc()`, Tatum + fullnode fallback); dynamic-field listing reads; wallet signing; download gated by `DatasetAccess`; Suiscan links (verified live); `npm run check` 0/0; builds.
-- [x] **MCP server** — **6 tools** (incl. `check_dataset_purchase`); `get_dataset_details` reads via dynamic field; Tatum-routed; `test-mcp` 9/1; two-server client config documented.
-- [x] **Docs** — README, API.md, Architecture.md, Deployment.md, CLAUDE.md, active-tasks all reconciled to the current package, single module, dynamic-field reads, and 6-tool MCP.
+- [x] **Contracts** — deployed `0x2797464…`; generic **`buy_dataset<T>` / `list_dataset<T>` (multi-token)**; **Seal access control** (`seal_approve` + `seal_policy_id` + `encrypted` flag); refund-from-buyer + double-buy prevention; `has_purchased`; single `nexus_marketplace` module; **15/15 Move tests**; 3 datasets re-seeded.
+- [x] **Frontend (core)** — marketplace/detail load (raw-`fetch` `rpc()`, Tatum + fullnode fallback); dynamic-field listing reads; wallet signing; download gated by `DatasetAccess`; Suiscan links (verified live); `npm run check` 0/0; builds. PTB builders are token-/Seal-aware (`coinType`, `sealPolicyId`).
+- [x] **MCP server** — **7 tools** (adds opt-in custodial `buy_dataset`); `get_dataset_details` via dynamic field; Tatum-routed; `test-mcp` 9/1; npm-publish-ready; two-server client config documented.
+- [x] **Docs** — README, API.md, Architecture.md, Deployment.md, Testing-Guide.md, Publishing-MCP.md reconciled to the current package + dynamic-field reads (multi-token/Seal frontend docs land with that UI).
 - [x] **B-1** Vercel Authentication disabled.
 - [x] **B-3** demo flow recorded (verify per below).
 
 ### ⚠️ User action (required)
 - [ ] **B-2** — set the two Vercel env vars to the **current** IDs and **redeploy the frontend** (they may point at the dead `0x86208eab…`):
-  - `PUBLIC_NEXUS_PACKAGE_ID=0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6`
-  - `PUBLIC_NEXUS_MARKETPLACE_ID=0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99`
+  - `PUBLIC_NEXUS_PACKAGE_ID=0x2797464179d14bd6ac9463019abb2000d840fc33547b378372ed3b6fc6b393e7`
+  - `PUBLIC_NEXUS_MARKETPLACE_ID=0xac47e84574ce49163c02c2ea7f9e472aa45fcf64de599b97e8cac2e95f417430`
   - *(Also redeploy regardless — the latest frontend bug-fixes only go live on a new deploy.)*
 - [ ] **B-3 verify** — confirm the demo video shows no old address/object/blob (re-record only if it does).
 - [ ] **Submit** — public repo + 2–3 min video (Definition of Done, CLAUDE.md §22).
 
-### 🔭 Stretch / out-of-MVP (explicitly not blocking — CLAUDE.md §19)
-- [ ] MCP server signing the `buy_dataset` PTB itself (needs server-side key custody).
-- [ ] Encrypted dataset previews; multi-token payments.
+### 🔭 Stretch / out-of-MVP (CLAUDE.md §19)
+- [x] **MCP server signs `buy_dataset` itself** — opt-in `buy_dataset` tool (custodial key, `NEXUS_ENABLE_SIGNING`); signs via fullnode; dry-run verified (`DatasetPurchased` + `DatasetAccess`). Default-off/safe.
+- [x] **MCP server publish-ready for npm** — `bin`/shebang/`files`/`publishConfig` set; guide in [Publishing-MCP.md](./Publishing-MCP.md). *(Actual `npm publish` needs your npm login.)*
+- [x] **Multi-token payments — contract** — `Coin<T>`-generic `list_dataset<T>`/`buy_dataset<T>`; listing stores `coin_type`; deployed in `0x2797464…`; `buy_dataset<SUI>` dry-run success. **Frontend UI (currency picker/display, pay-in-token) ⏳ in progress.**
+- [x] **Encrypted previews — contract** — Seal access control via `seal_approve(id, &DatasetAccess)` + per-listing `seal_policy_id` + `encrypted` event flag; deployed + tested (15/15). **Frontend Seal encrypt-on-upload / decrypt-on-download (SessionKey + key servers) ⏳ in progress — needs browser+wallet testing.**
