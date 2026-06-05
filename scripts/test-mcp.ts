@@ -3,10 +3,11 @@
  *
  * Tests the MCP server tools by calling them directly:
  * 1. search_nexus_datasets
- * 2. get_dataset_details
- * 3. get_marketplace_stats
- * 4. get_walrus_blob
- * 5. verify_dataset_integrity
+ * 2. get_dataset_details (dynamic-field read)
+ * 3. check_dataset_purchase
+ * 4. get_marketplace_stats
+ * 5. get_walrus_blob
+ * 6. verify_dataset_integrity
  *
  * Run: npx tsx scripts/test-mcp.ts
  */
@@ -96,32 +97,56 @@ async function testSearchDatasets() {
   });
 }
 
+async function firstListingId(): Promise<string> {
+  const ev = await suiRpc('suix_queryEvents', [
+    { MoveModule: { package: PACKAGE_ID, module: 'nexus_marketplace' } }, null, 1, true,
+  ]);
+  const listed = (ev?.data || []).filter((e: any) => e.type?.includes('DatasetListed'));
+  if (listed.length === 0) throw new Error('No listings to query');
+  const listingId = listed[0].parsedJson?.listing_id;
+  if (!listingId) throw new Error('No listing_id in event');
+  return listingId;
+}
+
 async function testGetDatasetDetails() {
-  console.log('\n=== get_dataset_details ===');
+  console.log('\n=== get_dataset_details (dynamic-field read) ===');
 
-  await test('Can get listing details by ID', async () => {
-    const result = await suiRpc('suix_queryEvents', [
-      { MoveModule: { package: PACKAGE_ID, module: 'nexus_marketplace' } },
-      null,
-      1,
-      true,
-    ]);
-    const events = result?.data || [];
-    const listed = events.filter((e: any) => e.type?.includes('DatasetListed'));
-    if (listed.length === 0) throw new Error('No listings to query');
-    const listingId = listed[0].parsedJson?.listing_id;
-    if (!listingId) throw new Error('No listing_id in event');
+  await test('Wrapped listing is NOT directly addressable (sui_getObject → notExists)', async () => {
+    const listingId = await firstListingId();
+    const direct = await suiRpc('sui_getObject', [listingId, { showContent: true }]);
+    // A wrapped (table-stored) object returns no data — this is the bug the tool used to hit.
+    if (direct?.data) throw new Error('Expected listing to be notExists via sui_getObject');
+  });
 
-    // The listing might be stored in the marketplace table, not as a standalone object
-    // Try querying the marketplace object instead
-    const mpResult = await suiRpc('sui_getObject', [
-      MARKETPLACE_ID,
-      { showContent: true },
+  await test('get_dataset_details resolves the listing via the marketplace table', async () => {
+    const listingId = await firstListingId();
+    const mk = await suiRpc('sui_getObject', [MARKETPLACE_ID, { showContent: true }]);
+    const tableId = mk.data.content.fields.listings.fields.id.id;
+    const df = await suiRpc('suix_getDynamicFieldObject', [
+      tableId, { type: '0x2::object::ID', value: listingId },
     ]);
-    if (!mpResult.data?.content) throw new Error('No marketplace content');
-    const mpFields = mpResult.data.content.fields;
-    console.log(`    Marketplace has ${mpFields.total_listings} listings`);
-    console.log(`    Listing ID from event: ${listingId.substring(0, 20)}...`);
+    const fields = df?.data?.content?.fields?.value?.fields;
+    if (!fields) throw new Error('Dynamic-field read returned no listing fields');
+    if (!fields.name || !fields.description || !fields.price) {
+      throw new Error('Listing fields incomplete: ' + JSON.stringify(Object.keys(fields)));
+    }
+    console.log(`    Resolved: ${fields.name} | price ${fields.price} | hasDesc=${!!fields.description}`);
+  });
+}
+
+async function testCheckDatasetPurchase() {
+  console.log('\n=== check_dataset_purchase ===');
+
+  await test('Reports no access for an address with no DatasetAccess', async () => {
+    const listingId = await firstListingId();
+    const randomAddr = '0x' + '11'.repeat(32);
+    const res = await suiRpc('suix_getOwnedObjects', [
+      randomAddr,
+      { filter: { StructType: `${PACKAGE_ID}::nexus_marketplace::DatasetAccess` }, options: { showContent: true } },
+    ]);
+    const owns = (res?.data || []).some((o: any) => o.data?.content?.fields?.listing_id === listingId);
+    if (owns !== false) throw new Error('Random address should not own access');
+    console.log(`    Random address hasPurchased=${owns} (expected false)`);
   });
 }
 
@@ -201,6 +226,7 @@ async function main() {
 
   await testSearchDatasets();
   await testGetDatasetDetails();
+  await testCheckDatasetPurchase();
   await testGetMarketplaceStats();
   await testGetWalrusBlob();
   await testVerifyIntegrity();

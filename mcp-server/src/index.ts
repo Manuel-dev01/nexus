@@ -7,6 +7,7 @@
  * - get_walrus_blob: Download raw dataset from Walrus
  * - get_marketplace_stats: Marketplace overview
  * - verify_dataset_integrity: Check blob hash
+ * - check_dataset_purchase: Whether an address already owns access to a listing
  *
  * All Sui reads are routed through Tatum's RPC gateway.
  * Implements Model Context Protocol (MCP) for LLM integration.
@@ -140,6 +141,45 @@ async function getAllListings(): Promise<DatasetListing[]> {
   return listings;
 }
 
+// DatasetListing objects are stored INSIDE the marketplace's `listings` Table,
+// which wraps them — so `sui_getObject(listingId)` returns `notExists`. They
+// must be read as dynamic fields of the table (key type `0x2::object::ID`).
+let listingsTableIdCache: string | null = null;
+
+async function getListingsTableId(): Promise<string> {
+  if (listingsTableIdCache) return listingsTableIdCache;
+  const mk = await suiRpc('sui_getObject', [MARKETPLACE_ID, { showContent: true }]);
+  const id = mk?.data?.content?.fields?.listings?.fields?.id?.id;
+  if (!id) throw new Error('Could not resolve marketplace listings table');
+  listingsTableIdCache = id;
+  return id;
+}
+
+/** Read a single listing's on-chain fields from the marketplace table. Null if absent. */
+async function getListingFields(listingId: string): Promise<any | null> {
+  const tableId = await getListingsTableId();
+  const df = await suiRpc('suix_getDynamicFieldObject', [
+    tableId,
+    { type: '0x2::object::ID', value: listingId },
+  ]);
+  return df?.data?.content?.fields?.value?.fields ?? null;
+}
+
+/** Check whether an address owns a DatasetAccess for a listing (proof of purchase). */
+async function ownsDatasetAccess(address: string, listingId: string): Promise<boolean> {
+  const res = await suiRpc('suix_getOwnedObjects', [
+    address,
+    {
+      filter: { StructType: `${PACKAGE_ID}::nexus_marketplace::DatasetAccess` },
+      options: { showContent: true },
+    },
+  ]);
+  return (res?.data || []).some((obj: any) => {
+    const content = obj.data?.content;
+    return content?.dataType === 'moveObject' && content.fields?.listing_id === listingId;
+  });
+}
+
 // === MCP Server Setup ===
 
 const server = new McpServer({
@@ -224,19 +264,16 @@ server.tool(
   },
   async ({ listingId }) => {
     try {
-      const result = await suiRpc('sui_getObject', [
-        listingId,
-        { showContent: true, showOwner: true },
-      ]);
+      // Listings are wrapped in the marketplace table — read via dynamic field,
+      // not sui_getObject (which returns notExists for wrapped objects).
+      const fields = await getListingFields(listingId);
 
-      if (!result.data?.content || result.data.content.dataType !== 'moveObject') {
+      if (!fields) {
         return {
           content: [{ type: 'text', text: 'Error: Listing not found' }],
           isError: true
         };
       }
-
-      const fields = result.data.content.fields as any;
 
       return {
         content: [{
@@ -410,6 +447,44 @@ server.tool(
     } catch (error) {
       return {
         content: [{ type: 'text', text: `Error verifying integrity: ${error}` }],
+        isError: true
+      };
+    }
+  }
+);
+
+/**
+ * Check whether an address already purchased a dataset (proof-of-purchase).
+ * Lets an agent avoid the on-chain EAlreadyPurchased abort before buying again,
+ * and confirm it owns download access after a purchase.
+ */
+server.tool(
+  'check_dataset_purchase',
+  'Check whether a wallet address already owns purchase access (a DatasetAccess) for a given Nexus dataset listing. Use before buying to avoid a duplicate-purchase error, or to confirm download rights.',
+  {
+    address: z.string().describe('The wallet address to check'),
+    listingId: z.string().describe('The dataset listing object ID')
+  },
+  async ({ address, listingId }) => {
+    try {
+      const hasAccess = await ownsDatasetAccess(address, listingId);
+      return {
+        content: [{
+          type: 'text',
+          text: JSON.stringify({
+            address,
+            listingId,
+            hasPurchased: hasAccess,
+            canDownload: hasAccess,
+            note: hasAccess
+              ? 'This address already owns access — buying again would abort with EAlreadyPurchased.'
+              : 'No access found — this address can purchase this dataset.'
+          }, null, 2)
+        }]
+      };
+    } catch (error) {
+      return {
+        content: [{ type: 'text', text: `Error checking purchase: ${error}` }],
         isError: true
       };
     }

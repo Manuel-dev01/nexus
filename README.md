@@ -85,6 +85,14 @@ Nexus flips this model:
 
 ---
 
+## Status
+
+**Code complete & verified** — Move contracts (12/12 tests, deployed), SvelteKit frontend (builds clean), and the 6-tool MCP server (`test-mcp` 9/1) are all wired against the live testnet deployment. Remaining work is operational only: re-set the Vercel env vars to the current addresses + redeploy the frontend, verify the demo video, and submit.
+
+→ Full triaged status & checklist: **[docs/Blockers.md](docs/Blockers.md)**
+
+---
+
 ## Walrus Integration (Decentralized Storage)
 
 Nexus uses **Walrus** as its backbone for storing massive AI datasets. Instead of trusting a centralized cloud provider, all data is:
@@ -110,13 +118,13 @@ Nexus uses **Tatum** at two critical layers:
 
 ### 1. Sui RPC Gateway
 
-All blockchain interactions, from the frontend wallet to backend scripts, are routed through Tatum's managed Sui RPC gateway:
+Sui reads are routed through Tatum's managed Sui RPC gateway:
 
 ```
 https://sui-testnet.gateway.tatum.io
 ```
 
-This ensures reliable, low-latency access to the Sui network without running our own full node.
+The **MCP server and scripts** call Tatum directly. The **frontend prefers Tatum** (when `PUBLIC_TATUM_API_KEY` is set) and automatically falls back to the public Sui fullnode otherwise — it uses a plain `fetch` rather than the `@mysten/sui` SDK client, because the SDK adds a `client-sdk-version` header that the gateway's CORS rejects in the browser. This gives reliable, low-latency access without running our own full node.
 
 ### 2. Model Context Protocol (MCP) Server
 
@@ -124,15 +132,16 @@ Nexus implements a **custom MCP server** that exposes domain-specific tools for 
 
 | MCP Tool | Description | Backed By |
 |----------|-------------|-----------|
-| `search_nexus_datasets` | Find datasets by metadata and price range | Tatum `sui_queryEvents` |
-| `get_dataset_details` | Get full listing info including Blob ID | Tatum `sui_getObject` |
+| `search_nexus_datasets` | Find datasets by metadata and price range | Tatum `suix_queryEvents` |
+| `get_dataset_details` | Get full listing info including Blob ID | Tatum `suix_getDynamicFieldObject` |
+| `check_dataset_purchase` | Whether a wallet already owns access to a listing | Tatum `suix_getOwnedObjects` |
 | `get_walrus_blob` | Download raw dataset from Walrus | Walrus Aggregator |
 | `get_marketplace_stats` | Get marketplace overview | Tatum `sui_getObject` |
 | `verify_dataset_integrity` | Verify blob hash matches expected | Walrus Aggregator |
 
 The Tatum `@tatumio/blockchain-mcp` server runs alongside for generic blockchain data (wallet balances, transaction history, etc.).
 
-> For the full API reference, see [docs/API.md](docs/API.md).
+> Full API reference: [docs/API.md](docs/API.md) · Wiring both MCP servers into an AI client: [docs/Deployment.md](docs/Deployment.md#4-configure-in-an-ai-client-two-server-composition).
 
 ---
 

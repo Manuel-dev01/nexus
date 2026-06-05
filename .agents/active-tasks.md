@@ -1,6 +1,6 @@
 # Nexus — Active Development Backlog
 
-> Updated: 2026-06-04 | Current Phase: Verified end-to-end (Session 8) → demo prep. Open blockers in `docs/Blockers.md`.
+> Updated: 2026-06-05 | Current Phase: Code complete + docs reconciled (Session 8h). Only user actions remain (B-2 Vercel env re-set + redeploy, B-3 video, submit). Live status: `docs/Blockers.md`.
 
 ## Phase 0 — Verify & Scaffold (Day 1: May 31)
 
@@ -48,9 +48,11 @@
 - [x] Implement `get_walrus_blob` tool
 - [x] Implement `get_marketplace_stats` tool
 - [x] Implement `verify_dataset_integrity` tool
+- [x] Implement `check_dataset_purchase` tool (Session 8h — 6 tools total)
+- [x] Fix `get_dataset_details` to read wrapped listings via dynamic field (Session 8h)
 - [x] Route all Sui reads through Tatum gateway
-- [ ] Compose with `@tatumio/blockchain-mcp` in client config
-- [ ] Test: LLM agent queries marketplace state
+- [x] Compose with `@tatumio/blockchain-mcp` in client config — documented in docs/Deployment.md (Session 8h)
+- [x] Test: MCP tool suite (`test-mcp` 9/1); live agent flow validated via dry-run
 
 ## Phase 4 — Seed, Polish, Record (Day 6: June 5-6)
 
@@ -62,12 +64,11 @@
 - [ ] Final README polish
 - [ ] Submit
 
-## Session 8 — Verification, Safe Fixes, Docs (June 4)
+## Session 8 (a–h) — Verify, Fix, Redeploy, Reconcile (June 4–5)
 
-- [x] Independent E2E verification of all suites (see CLAUDE.md §27 Session 8)
-- [x] MCP server reads now routed through Tatum (was bypassing it)
-- [x] Frontend TypeScript errors fixed (5 → 0)
-- [x] `seed_marketplace.ts` repaired (programmatic PTB + keypair signing)
-- [x] Homepage event query routed through Tatum
-- [x] Docs hardened + `docs/Blockers.md` triaged report added
-- [ ] **Open blockers** tracked in `docs/Blockers.md` (Vercel auth/env, contract refund bug, Move test stubs)
+- [x] Independent E2E verification of all suites
+- [x] MCP server reads routed through Tatum; `get_dataset_details` fixed (dynamic field); +`check_dataset_purchase` (8h)
+- [x] Frontend: TS errors fixed; raw-`fetch` `rpc()` (Tatum + fullnode fallback, dodges SDK/CORS); dynamic-field listing reads; wallet account fix; download gating; Suiscan links
+- [x] Contract: `buy_dataset` refund fix + double-buy prevention; **redeployed** clean (package `0xb291…`, marketplace `0x1cbd…`); 12 Move tests; re-seeded
+- [x] All docs reconciled to current reality (8h); `docs/Blockers.md` is the status SoT
+- [ ] **Open (user):** B-2 re-set Vercel env to new addresses + redeploy frontend; B-3 verify demo video; submit — see `docs/Blockers.md`

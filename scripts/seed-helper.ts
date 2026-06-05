@@ -53,7 +53,7 @@ async function main() {
     if (result.digest) {
       console.log(`\n✅ Success!`);
       console.log(`  Transaction: ${result.digest}`);
-      console.log(`  Explorer: https://suiexplorer.com/txblock/${result.digest}?network=testnet`);
+      console.log(`  Explorer: https://suiscan.xyz/testnet/tx/${result.digest}`);
     } else {
       console.log(`\nResult: ${output}`);
     }

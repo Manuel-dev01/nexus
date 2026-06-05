@@ -3,7 +3,7 @@
 > ### ⚠️ Two manual blockers before the live demo
 > The deployed frontend will not be publicly reachable until **both** of these are done in the Vercel dashboard — neither can be set from code:
 > 1. **Deployment Protection → disable "Vercel Authentication"** (otherwise the URL shows a Vercel login wall).
-> 2. **Set `PUBLIC_NEXUS_PACKAGE_ID` and `PUBLIC_NEXUS_MARKETPLACE_ID`** env vars (recommended; the app also has hardcoded fallbacks, so it loads without them, but set them for prod clarity).
+> 2. **Set `PUBLIC_NEXUS_PACKAGE_ID` and `PUBLIC_NEXUS_MARKETPLACE_ID`** to the current IDs (below) and **redeploy the frontend**. ⚠️ **Required if env vars were set before a redeploy** — they would point at a now-dead package. The source has updated hardcoded fallbacks, so the app loads, but stale Vercel env vars override them.
 >
 > See [Required Vercel Dashboard Settings](#required-vercel-dashboard-settings) below. Full open-issue list: [Blockers.md](./Blockers.md).
 
@@ -82,12 +82,12 @@ vercel --prod
 **Environment Variables (set in Vercel Dashboard):**
 | Name | Value | Required? |
 |------|-------|-----------|
-| `PUBLIC_NEXUS_PACKAGE_ID` | `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6` | recommended |
-| `PUBLIC_NEXUS_MARKETPLACE_ID` | `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99` | recommended |
-| `PUBLIC_TATUM_API_KEY` | your Tatum API key | optional |
+| `PUBLIC_NEXUS_PACKAGE_ID` | `0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6` | required if any were set pre-redeploy |
+| `PUBLIC_NEXUS_MARKETPLACE_ID` | `0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99` | required if any were set pre-redeploy |
+| `PUBLIC_TATUM_API_KEY` | your Tatum API key | optional (enables frontend→Tatum) |
 
 Notes:
-- Contract addresses are also hardcoded in `frontend/src/lib/sui/config.ts` as fallbacks, so the first two are optional for the app to load.
+- Contract addresses are hardcoded in `frontend/src/lib/sui/config.ts` as fallbacks, so the app loads even with NO env vars set. But a Vercel env var, once set, **overrides** the fallback — so if it holds a stale (dead) address, the app breaks until you update it and redeploy.
 - **`PUBLIC_TATUM_API_KEY`**: if set, the frontend routes its read RPC through the Tatum gateway; if unset, it automatically falls back to the public Sui fullnode (the app works either way). The frontend uses a plain `fetch` for RPC — **not** the `@mysten/sui` SDK client — because the SDK adds a `client-sdk-version` request header that the Tatum gateway's CORS policy blocks in the browser.
 
 ## MCP Server Deployment
@@ -108,24 +108,38 @@ npx tsc
 node dist/index.js
 ```
 
-### 4. Configure in AI Client
-Add to MCP client config:
+### 4. Configure in an AI client (two-server composition)
+
+Nexus uses **two MCP servers side by side**: the custom **Nexus** server (domain tools) and Tatum's stock **`@tatumio/blockchain-mcp`** (generic chain data). Add both to your client's MCP config (e.g. Claude Desktop `claude_desktop_config.json`, Cursor, or any MCP client):
+
 ```json
 {
   "mcpServers": {
     "nexus": {
       "command": "node",
-      "args": ["path/to/nexus/mcp-server/dist/index.js"],
+      "args": ["/absolute/path/to/nexus/mcp-server/dist/index.js"],
       "env": {
-        "TATUM_API_KEY": "<tatum-api-key>",
+        "TATUM_API_KEY": "<your-tatum-api-key>",
         "TATUM_RPC_URL": "https://sui-testnet.gateway.tatum.io",
-        "NEXUS_PACKAGE_ID": "<package-id>",
-        "NEXUS_MARKETPLACE_ID": "<marketplace-id>"
+        "NEXUS_PACKAGE_ID": "0xb291fda48ee4d4094e36a9c65a6c9a6af596473dc62194c39c4ad7f73de804c6",
+        "NEXUS_MARKETPLACE_ID": "0x1cbd454312204274146f1e18f6e349297e9f7cac0281e20dc20ab6833652bd99",
+        "WALRUS_AGGREGATOR_URL": "https://aggregator.walrus-testnet.walrus.space"
       }
+    },
+    "tatum": {
+      "command": "npx",
+      "args": ["-y", "@tatumio/blockchain-mcp"],
+      "env": { "TATUM_API_KEY": "<your-tatum-api-key>" }
     }
   }
 }
 ```
+
+**Nexus server env vars** (all optional — hardcoded defaults exist; `TATUM_API_KEY` makes reads go through Tatum vs the public fullnode fallback): `TATUM_API_KEY`, `TATUM_RPC_URL`, `NEXUS_PACKAGE_ID`, `NEXUS_MARKETPLACE_ID`, `WALRUS_AGGREGATOR_URL`.
+
+**Nexus tools exposed:** `search_nexus_datasets`, `get_dataset_details`, `check_dataset_purchase`, `get_walrus_blob`, `get_marketplace_stats`, `verify_dataset_integrity` (+ the `marketplace://overview` resource).
+
+**Agent flow:** the LLM calls `search_nexus_datasets` → `get_dataset_details` → optionally `check_dataset_purchase` → presents the listing + price (a wallet signs the actual `buy_dataset` PTB) → `get_walrus_blob` to ingest the data.
 
 ## Testnet Deployment Status
 

@@ -50,21 +50,23 @@ Nexus is a decentralized AI model and memory marketplace built on Sui. Data prov
 
 | Object | Type | Owner | Purpose |
 |--------|------|-------|---------|
-| `Marketplace` | Shared | Shared | Holds all listings, treasury, config |
-| `DatasetListing` | Shared | In Marketplace table | A dataset for sale |
+| `Marketplace` | Shared | Shared | Holds `listings: Table<ID, DatasetListing>`, treasury, fee config, stats |
+| `DatasetListing` | Wrapped in the `listings` table | Marketplace | A dataset for sale; includes a `purchasers: Table<address,bool>` to block double-buys |
 | `DatasetAccess` | Owned | Buyer | Proves purchase, grants download |
-| `ProviderCap` | Owned | Provider | Controls listing (delist) |
+| `ProviderCap` | Owned | Provider | Capability required to delist |
+
+> Because each `DatasetListing` is wrapped inside the marketplace table, it is **not** directly fetchable via `sui_getObject` (returns `notExists`). Both the frontend and the MCP server read listings via `suix_getDynamicFieldObject` on the table, and discover them via `DatasetListed` events.
 
 **Functions:**
 
 | Function | Purpose |
 |----------|---------|
-| `list_dataset` | Create a new listing (provider) |
-| `buy_dataset` | Purchase a listing (buyer) |
-| `delist_dataset` | Remove listing (provider only) |
-| `get_listing` | View listing details |
-| `get_marketplace_stats` | View marketplace stats |
-| `withdraw_fees` | Withdraw treasury (admin) |
+| `list_dataset` | Create a new listing (provider); returns a `ProviderCap` |
+| `buy_dataset` | Purchase a listing (buyer); blocks double-buys (`EAlreadyPurchased`), refunds overpayment from the buyer's coin |
+| `delist_dataset` | Remove listing (provider only, via `ProviderCap`) |
+| `get_listing` / `get_marketplace_stats` | View listing / marketplace stats |
+| `has_purchased` | Whether an address already bought a listing |
+| `withdraw_fees` / `update_fee` / `set_paused` | Admin controls |
 
 **Economic Model:**
 - Prices in MIST (1 SUI = 1,000,000,000 MIST)
@@ -93,9 +95,9 @@ Nexus is a decentralized AI model and memory marketplace built on Sui. Data prov
 | `/dataset/[id]` | Dataset detail: metadata, sidebar, download, verify |
 
 **Key Libraries:**
-- `$lib/wallet/store.ts` — Sui Wallet Standard integration
+- `$lib/wallet/store.ts` — Sui Wallet Standard integration (connect + sign with the active account)
 - `$lib/walrus/client.ts` — Walrus HTTP API (upload/download/verify)
-- `$lib/sui/config.ts` — SuiJsonRpcClient via Tatum + PTB builders
+- `$lib/sui/config.ts` — browser-safe `rpc()` (raw fetch, Tatum-preferred + public-fullnode fallback), dynamic-field listing reads (`getListingFields`), PTB builders, and Suiscan link helpers
 - `$lib/components/Mark.svelte` — Convergence mark SVG
 
 ### 3. MCP Server (Node.js)
@@ -106,11 +108,14 @@ Nexus is a decentralized AI model and memory marketplace built on Sui. Data prov
 
 | Tool | Description |
 |------|-------------|
-| `search_nexus_datasets` | Search by category, price, keyword |
-| `get_dataset_details` | Get full listing metadata |
+| `search_nexus_datasets` | Search by category, price, keyword (via events) |
+| `get_dataset_details` | Get full listing metadata (via dynamic field) |
+| `check_dataset_purchase` | Whether an address already owns access to a listing |
 | `get_walrus_blob` | Download blob from Walrus |
 | `get_marketplace_stats` | Marketplace overview |
 | `verify_dataset_integrity` | Check blob hash |
+
+The stock `@tatumio/blockchain-mcp` server is composed alongside it (see [Deployment.md](./Deployment.md#4-configure-in-an-ai-client-two-server-composition)).
 
 **Resources:**
 
@@ -143,8 +148,8 @@ Nexus is a decentralized AI model and memory marketplace built on Sui. Data prov
 - Auth: `x-api-key` header
 
 **Usage:**
-- Frontend SuiJsonRpcClient configured with Tatum transport
-- MCP server uses direct Sui RPC for reliability
+- MCP server + scripts call Tatum directly (raw JSON-RPC), with the public fullnode as a fallback.
+- Frontend uses a raw-`fetch` `rpc()` helper (Tatum-preferred when a key is set, public-fullnode fallback). It avoids the `@mysten/sui` SDK client in the browser because the SDK's `client-sdk-version` header is rejected by Tatum's CORS.
 
 ## Data Flow
 
@@ -174,8 +179,10 @@ Consumer → Frontend (dataset detail page)
 ### Agent Flow (AI)
 ```
 AI Agent → MCP Server (stdio)
-  → search_nexus_datasets (query events)
-  → get_dataset_details (get metadata)
+  → search_nexus_datasets (query DatasetListed events)
+  → get_dataset_details (read listing via dynamic field)
+  → check_dataset_purchase (skip if already owned)
+  → [wallet signs buy_dataset PTB]
   → get_walrus_blob (download data)
   → verify_dataset_integrity (check hash)
 ```
@@ -197,8 +204,9 @@ AI Agent → MCP Server (stdio)
 
 ## Security Considerations
 
-- **Object Ownership:** DatasetListing can only be delisted by the original provider (via ProviderCap)
-- **Payment Security:** Uses `coin::split` and `coin::into_balance` for safe SUI handling
+- **Object Ownership:** DatasetListing can only be delisted by the original provider (via ProviderCap; the contract also re-checks `provider == sender`)
+- **Payment Security:** Takes exactly `price` from the payment, refunds overpayment from the buyer's own coin (never the treasury), pays the provider `price − fee`
+- **Double-buy prevention:** A `purchasers` table on each listing blocks repeat purchases by the same address (`EAlreadyPurchased`)
 - **Fee Protection:** Platform fee hardcoded at 200 bps, max 10% (admin can update)
 - **Input Validation:** Non-empty names, descriptions, blob IDs; positive prices
 - **Wallet Integration:** Uses Sui Wallet Standard (no private keys in code)

@@ -44,11 +44,19 @@ Purchase a dataset listing.
 | `clock` | `&Clock` | Sui system clock |
 
 **Behavior:**
-- Splits payment: 2% to treasury, 98% to provider
-- Creates `DatasetAccess` for buyer
-- Refunds excess payment if any
+- Takes exactly `price` from the payment: 2% (200 bps) to the marketplace treasury, the remaining 98% to the provider.
+- Refunds any overpayment **from the buyer's own coin** (never the treasury).
+- Records the buyer in the listing's `purchasers` table and mints a `DatasetAccess` (owned) to the buyer.
 
-**Events:** Emits `DatasetPurchased`
+**Error conditions (aborts):**
+| Code | When |
+|------|------|
+| `EAlreadyPurchased` | The buyer already owns access to this listing (no double-buy) |
+| `EInsufficientPayment` | `payment` < `price` |
+| `EListingNotActive` | Listing delisted, or the marketplace is paused |
+| `EListingNotFound` | `listing_id` not in the marketplace |
+
+**Events:** Emits `DatasetPurchased` (includes `platform_fee` and `provider_payout`)
 
 ---
 
@@ -83,6 +91,34 @@ Get listing details.
 Get marketplace statistics.
 
 **Returns:** `(u64, u64, u64, u64)` — (total_listings, total_sales, total_volume, treasury)
+
+---
+
+#### `has_purchased`
+Check whether an address already purchased a listing (used to avoid `EAlreadyPurchased`).
+
+**Parameters:**
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `marketplace` | `&Marketplace` | Shared marketplace object |
+| `listing_id` | `ID` | Listing to check |
+| `addr` | `address` | Address to check |
+
+**Returns:** `bool`
+
+---
+
+### Objects
+
+| Object | Ownership | Notes |
+|--------|-----------|-------|
+| `Marketplace` | Shared | Holds `listings: Table<ID, DatasetListing>`, `treasury`, `fee_bps` (200), stats |
+| `DatasetListing` | Stored in the marketplace `listings` table | Includes `purchasers: Table<address,bool>` for double-buy prevention |
+| `DatasetAccess` | Owned (buyer) | Proof of purchase + download rights; holds the `walrus_blob_id` |
+| `ProviderCap` | Owned (provider) | Capability required to `delist_dataset` |
+
+> **Reading a listing off-chain:** because `DatasetListing` is stored *inside* the marketplace `listings` table, it is a wrapped object — `sui_getObject(listingId)` returns `notExists`. Read it instead via the table's dynamic field:
+> `suix_getDynamicFieldObject(<listingsTableId>, { type: "0x2::object::ID", value: <listingId> })`, where the listing fields live under `content.fields.value.fields`. (Discover the `listingsTableId` from the marketplace object's `listings.fields.id.id`.) Listing discovery for the grid uses `DatasetListed` events.
 
 ---
 
@@ -149,12 +185,25 @@ Search for datasets by category, price, or keyword.
 ---
 
 ### `get_dataset_details`
-Get full metadata for a listing.
+Get full metadata for a listing. Reads the wrapped listing via `suix_getDynamicFieldObject` (see the note under Smart Contract API → Objects), not `sui_getObject`.
 
 **Parameters:**
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | `listingId` | `string` | Yes | Listing object ID |
+
+---
+
+### `check_dataset_purchase`
+Check whether a wallet already owns access (a `DatasetAccess`) for a listing — lets an agent avoid the `EAlreadyPurchased` abort before buying, or confirm download rights after.
+
+**Parameters:**
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| `address` | `string` | Yes | Wallet address to check |
+| `listingId` | `string` | Yes | Listing object ID |
+
+**Returns:** `{ hasPurchased: boolean, canDownload: boolean, ... }`
 
 ---
 
@@ -202,10 +251,13 @@ x-api-key: <TATUM_API_KEY>
 ### Common Methods
 | Method | Purpose |
 |--------|---------|
-| `sui_getObject` | Get object by ID |
-| `suix_queryEvents` | Query events by type |
-| `suix_getOwnedObjects` | Get objects owned by address |
+| `sui_getObject` | Get a standalone object (e.g. the `Marketplace`) by ID |
+| `suix_getDynamicFieldObject` | Read a `DatasetListing` from the marketplace `listings` table |
+| `suix_queryEvents` | Query `DatasetListed` / `DatasetPurchased` events |
+| `suix_getOwnedObjects` | Find a buyer's `DatasetAccess` objects (proof of purchase) |
 | `sui_getLatestCheckpointSequenceNumber` | Latest checkpoint |
+
+> The frontend uses these via a plain `fetch` (not the `@mysten/sui` SDK client) — the SDK adds a `client-sdk-version` header that the Tatum gateway's CORS rejects in the browser — and prefers Tatum, falling back to the public Sui fullnode if no key is set. The MCP server and scripts call Tatum directly.
 
 ---
 
