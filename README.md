@@ -66,8 +66,6 @@ Nexus flips this model:
 
 **Frontend:** https://nexus-place.vercel.app
 
-> ⚠️ **Public access:** the Vercel project must have **Deployment Protection → Vercel Authentication disabled** for this URL to load without a Vercel login. If you hit a login wall, that toggle is still on — disable it in the Vercel dashboard (Settings → Deployment Protection).
-
 **Deployed Contracts (Sui Testnet):**
 
 | Contract | Object ID (click to verify on Suiscan) |
