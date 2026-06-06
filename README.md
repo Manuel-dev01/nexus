@@ -96,8 +96,6 @@ Nexus flips this model:
 - **Encrypted datasets (Seal)** — datasets can be encrypted client-side with [Mysten Seal](https://github.com/MystenLabs/seal); the on-chain `seal_approve(id, &DatasetAccess)` releases the decryption key only to buyers (token-gated decryption).
 - **Autonomous purchasing** — the MCP server can sign and submit `buy_dataset` itself with a custodial key (opt-in `NEXUS_ENABLE_SIGNING`), so the agent completes the trade end-to-end.
 
-Remaining: re-set the Vercel env vars to the current addresses + redeploy the frontend; a browser+wallet pass on the Seal encrypt→buy→decrypt loop (live key-server round-trips can't be verified headless); record/verify the demo; submit.
-
 ---
 
 ## Walrus Integration (Decentralized Storage)
@@ -289,18 +287,6 @@ nexus/
 +-- .env.example                    # Environment template
 +-- README.md                       # You are here
 ```
-
----
-
-## Prize Track Alignment
-
-| Prize | How Nexus Qualifies |
-|-------|-------------------|
-| **Grand Prize** | Full-stack dApp: Move contracts + SvelteKit UI + AI agent integration |
-| **Best Walrus Integration** | All datasets stored on Walrus with RedStuff erasure coding. Upload, download, and blob management are core to the product. |
-| **Best Use of Tatum Tools** | Every Sui RPC call routes through Tatum gateway. Custom MCP server enables AI agents to autonomously interact with the marketplace. Two-server MCP composition (Tatum + Nexus). |
-
----
 
 ## License
 
